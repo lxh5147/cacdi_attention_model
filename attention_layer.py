@@ -57,13 +57,17 @@ class Attention(Layer):
         x: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
-        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs))  # batch_size, time_steps, attention_weight_vector_dim
-        ai = K.exp(time_distributed_dense(ui, self.us))  # batch_size, time_steps, 1
+
+        input_dim = K.int_shape(x)[2]
+        time_steps = K.int_shape(x)[1]
+        
+        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs,input_dim=input_dim,output_dim=self.attention_weight_vector_dim,timesteps=time_steps))  # batch_size, time_steps, attention_weight_vector_dim
+        ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us,1),input_dim=self.attention_weight_vector_dim,output_dim=1,timesteps=time_steps))  # batch_size, time_steps, 1
         sum_of_ai = K.sum(ai, 1, keepdims = True)  # batch_size 1 1
-        time_steps = K.shape(x)[1]
+        
         sum_of_ai = K.repeat_elements(sum_of_ai, rep = time_steps, axis = 1)  # batch_size time_steps 1
         ai = ai / sum_of_ai  # batch_size * time_steps * 1
-        input_dim = K.shape(x)[2]
+        
         ai = K.repeat_elements(ai, rep = input_dim, axis = 2)  # batch_size time_steps input_dim
         # batch_size *time_steps * input_dim -> batch_size* input_dim
         output = K.sum(ai * x, 1)
@@ -93,7 +97,7 @@ def transform_sequence_to_sequence(input_sequence, output_dim):
     h1 = encoder_left_to_right(input_sequence)
     encoder_right_to_left = GRU(output_dim, return_sequences = True, go_backwards = True)
     h2 = encoder_right_to_left(input_sequence)
-    h = K.concatenate([h1, h2], 1)
+    h = K.concatenate([h1, h2], 2)
     return h
 
 def apply_attention_layer_with_sequence_to_sequence_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
@@ -118,7 +122,7 @@ def transform_sequence_to_vector_encoder(input_sequence, output_dim):
     check_and_throw_if_fail(output_dim > 0 , "output_dim")
     conv = Convolution1D(output_dim, 3, border_mode = 'same')
     output = conv(input_sequence)
-    timesteps = K.shape(input_sequence)[1]
+    timesteps = K.int_shape(input_sequence)[1]
     pooling = MaxPooling1D(pool_length = timesteps)
     output = pooling(output)  # batch_size * 1 * output_dim
     # to remove the time step dimension
