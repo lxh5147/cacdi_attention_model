@@ -7,6 +7,7 @@ Created on Jul 5, 2016
 from keras import backend as K
 from keras.layers.embeddings import Embedding
 from keras.layers import Input
+from keras.layers.core import Lambda
 from keras.layers import Dense, Dropout, Activation
 from keras.layers.wrappers import TimeDistributed
 from attention_layer import check_and_throw_if_fail, apply_attention_layer_with_sequence_to_sequence_encoder 
@@ -62,7 +63,7 @@ def apply_mlp_softmax_classifier(input_sequence, output_dim, hidden_unit_numbers
     '''
     check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
     output = input_sequence
-    for hidden_unit_number, drop_out_rate in zip([hidden_unit_numbers, drop_out_rates]):
+    for hidden_unit_number, drop_out_rate in zip(hidden_unit_numbers, drop_out_rates):
         output = TimeDistributed(Dense(hidden_unit_number, init = 'uniform'))(output)
         output = TimeDistributed(Activation('tanh'))(output)
         output = TimeDistributed(Dropout(drop_out_rate))(output)
@@ -71,8 +72,12 @@ def apply_mlp_softmax_classifier(input_sequence, output_dim, hidden_unit_numbers
     # return batch_size*time_steps, output_dim
     return K.reshape(output, (-1, output_dim))
 
+def to_keras_tensor(tensor): 
+    return Lambda(lambda x: x )(tensor)
+
 def build_hierarchical_attention_model(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, output_dim, hidden_unit_numbers, drop_out_rates):
-    inputs, cur_input = build_hierarchical_attention_layers(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding)
-    output = apply_mlp_softmax_classifier(cur_input, output_dim, hidden_unit_numbers, drop_out_rates)
+    inputs, attention = build_hierarchical_attention_layers(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding)
+    output = apply_mlp_softmax_classifier(attention, output_dim, hidden_unit_numbers, drop_out_rates)
+    output = to_keras_tensor(output)  
     model = Model(input = inputs, output = output)
     return model
