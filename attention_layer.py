@@ -9,6 +9,9 @@ from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.engine.topology import merge
+from keras.layers import Input
+from keras.layers.embeddings import Embedding
+
 import numpy as np
 
 import logging
@@ -154,6 +157,16 @@ class SequenceToVectorEncoder(Layer):
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         return (input_shape[0],self.output_dim)
     
+def build_hierarchical_attention_model_inputs(input_shape, input_feature_dims):
+    inputs = []
+    check_and_throw_if_fail(len(input_shape) >= 2 , "input_shape")
+    check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
+    total_dim = len(input_shape)
+    inputs.append(Input(shape = input_shape,dtype="int32"))
+    # increase one dimension
+    for cur_dim in xrange(total_dim - 1 , -1, -1):
+        inputs.append(Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],)))        
+    return inputs
 
 def apply_attention_layer_with_sequence_to_sequence_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
     '''
@@ -182,3 +195,70 @@ def apply_attention_layer_with_sequence_to_vector_encoder(input_sequence, output
     transformed_vector = sequence_to_vector_encoder(input_sequence)
     attention_vector = attention_layer(input_sequence)
     return merge(inputs=[attention_vector, transformed_vector], mode='concat', concat_axis=-1)
+
+class HierarchicalAttention(Layer):
+    '''
+    Represents hierarchical attention layer
+    '''
+    def __init__(self, top_feature_dim,   attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, **kwargs):
+        check_and_throw_if_fail(len(attention_output_dims) > 0 , "attention_output_dims")
+        check_and_throw_if_fail(len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")        
+        self.attention_output_dims = attention_output_dims
+        self.attention_weight_vector_dims=attention_weight_vector_dims
+        self.embedding_rows = embedding_rows
+        self.embedding_dim = embedding_dim
+        self.initial_embedding= initial_embedding
+        self.top_feature_dim = top_feature_dim
+        super(HierarchicalAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        '''
+        input_shape: batch_size* time_steps* documents * sections* sentences * words
+        '''
+        check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
+        check_and_throw_if_fail(len(self.attention_output_dims) == len(input_shape) - 2 , "output_dims")
+        self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights = [self.initial_embedding])
+        self.attention_layers=[]
+        self.encoder_layers=[]
+        total_dim = len(input_shape)
+        for cur_dim in xrange(total_dim - 1 , 1, -1):    
+            cur_output_dim = self.attention_output_dims[cur_dim - 2]
+            attention_weight_vector_dim = self.attention_weight_vector_dims[cur_dim - 2]
+            attetion_layer, encoder_layer = self.create_attention_layer(attention_weight_vector_dim, cur_output_dim)
+            self.attention_layers.append(attetion_layer)
+            self.encoder_layers.append(SequenceToVectorEncoder(encoder_layer) )
+    
+    def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim):
+        return Attention(attention_weight_vector_dim), SequenceToVectorEncoder(cur_output_dim)
+
+    def call_attention_layer(self, input_sequence, attention_layer, encoder_layer):
+        return attention_layer(encoder_layer(input_sequence))
+    
+    def get_output_dim(self):
+        return self.top_feature_dim + self.attention_output_dims[-1]*2
+    
+    def call(self, inputs, mask = None):
+        '''
+        inputs: a list of inputs
+        '''
+        check_and_throw_if_fail(type(inputs) is  list and len(inputs) == 2 + len(self.attention_layers) , "inputs")        
+        output  = self.embedding(inputs[0])
+        i=-2
+        for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
+            output = K.concatenate([output, inputs[i]], axis=-1)
+            cur_output_shape=K.int_shape(output)
+            output = K.reshape(output, shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
+            output = self.call_attention_layer(output,attention_layer,encoder_layer)
+            output = K.reshape(output, shape=(-1,) +  cur_output_shape[1:-2] + (K.int_shape(output)[1],))
+            i-=1
+    
+        # output: batch_size*time_steps*cacdi_snapshot_attention
+        output = K.concatenate ([output, inputs[0]],axis=-1)
+        return output
+
+    def get_output_shape_for(self, input_shape):
+        '''
+        input_shape: input shape
+        '''
+        check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
+        return input_shape[:2] + (self.get_output_dim(), )

@@ -7,7 +7,6 @@ Created on Jul 5, 2016
 from keras import backend as K
 from keras.layers.embeddings import Embedding
 from keras.layers import Input
-from keras.engine.topology import Layer
 from keras.layers.core import Reshape
 from keras.engine.topology import merge
 from keras.layers import Dense, Dropout, Activation
@@ -17,6 +16,17 @@ from keras.models import Model
 import logging
 
 logger = logging.getLogger(__name__)
+
+def build_hierarchical_attention_model_inputs(input_shape, input_feature_dims):
+    inputs = []
+    check_and_throw_if_fail(len(input_shape) >= 2 , "input_shape")
+    check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
+    total_dim = len(input_shape)
+    inputs.append(Input(shape = input_shape,dtype="int32"))
+    # increase one dimension
+    for cur_dim in xrange(total_dim - 1 , -1, -1):
+        inputs.append(Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],)))        
+    return inputs
 
 def build_hierarchical_attention_layers(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding):
     '''

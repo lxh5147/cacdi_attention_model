@@ -4,12 +4,12 @@ Created on Jul 11, 2016
 @author: lxh5147
 '''
 import unittest
-from attention_model import build_hierarchical_attention_layers, apply_mlp_softmax_classifier, build_hierarchical_attention_model
+from attention_model import  build_hierarchical_attention_layers, apply_mlp_softmax_classifier, build_hierarchical_attention_model
 from keras import backend as K
 import numpy as np
 
 class AttentionModelTest(unittest.TestCase):
-
+              
     def test_build_hierarchical_attention_layers(self):
         # time_steps* documents * sections* sentences * words
         input_shape=(7,8,5,6,9)
