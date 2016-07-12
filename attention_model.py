@@ -7,7 +7,9 @@ Created on Jul 5, 2016
 from keras import backend as K
 from keras.layers.embeddings import Embedding
 from keras.layers import Input
-from keras.layers.core import Lambda
+from keras.engine.topology import Layer
+from keras.layers.core import Reshape
+from keras.engine.topology import merge
 from keras.layers import Dense, Dropout, Activation
 from keras.layers.wrappers import TimeDistributed
 from attention_layer import check_and_throw_if_fail, apply_attention_layer_with_sequence_to_sequence_encoder 
@@ -32,26 +34,25 @@ def build_hierarchical_attention_layers(input_shape, input_feature_dims, output_
     embedding = Embedding(vocabulary_size, word_embedding_dim, weights = [initial_embedding])
     cur_input = Input(shape = input_shape,dtype="int32")
     inputs.append(cur_input)
-    # reshape to 2D
-    cur_input = K.reshape(cur_input, (-1, input_shape[-1]))
-    cur_input = embedding(cur_input)
-    # embedding increases dimension 
-    cur_input = K.reshape(cur_input, (-1,) + input_shape + (word_embedding_dim,))
-
+    # increase one dimension
+    cur_input = embedding(cur_input)    
     for cur_dim in xrange(total_dim - 1 , 0, -1):
         input_feature = Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],))
         inputs.append(input_feature)
-        cur_input = K.concatenate([cur_input, input_feature], axis = -1)
+        print(K.int_shape(cur_input))
+        print(K.int_shape(input_feature))
+        cur_input = merge(inputs=[cur_input, input_feature],mode='concat', concat_axis=-1)
         cur_input_shape = K.int_shape(cur_input)
-        cur_input = K.reshape(cur_input, (-1, cur_input_shape[-2], cur_input_shape[-1]))
+        cur_input = Reshape(target_shape= (cur_input_shape[-2], cur_input_shape[-1])) (cur_input)
         cur_output_dim = output_dims[cur_dim - 1]
         cur_input = apply_attention_layer_with_sequence_to_sequence_encoder(cur_input, cur_output_dim, attention_weight_vector_dim = attention_weight_vector_dims[cur_dim - 1])
-        cur_input = K.reshape(cur_input, (-1,) + cur_input_shape[1:-2] + (K.int_shape(cur_input)[1],))
+        cur_input = Reshape(target_shape= cur_input_shape[1:-2] + (K.int_shape(cur_input)[1],)) (cur_input)
+
 
     input_feature = Input(shape = input_shape[:1] + (input_feature_dims[0],))
     inputs.append(input_feature)
     # cur_input: batch_size*time_steps*cacdi_snapshot_attention
-    cur_input = K.concatenate([cur_input, input_feature], axis = -1)
+    cur_input = merge(inputs=[cur_input, input_feature],mode='concat', concat_axis=-1)
     return inputs, cur_input
 
 def apply_mlp_softmax_classifier(input_sequence, output_dim, hidden_unit_numbers, drop_out_rates):
@@ -70,14 +71,10 @@ def apply_mlp_softmax_classifier(input_sequence, output_dim, hidden_unit_numbers
     output = TimeDistributed(Dense(output_dim, init = 'uniform'))(output)
     output = TimeDistributed(Activation('softmax'))(output)
     # return batch_size*time_steps, output_dim
-    return K.reshape(output, (-1, output_dim))
-
-def to_keras_tensor(tensor): 
-    return Lambda(lambda x: x )(tensor)
+    return Reshape(target_shape=(output_dim,))(output)
 
 def build_hierarchical_attention_model(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, output_dim, hidden_unit_numbers, drop_out_rates):
     inputs, attention = build_hierarchical_attention_layers(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding)
     output = apply_mlp_softmax_classifier(attention, output_dim, hidden_unit_numbers, drop_out_rates)
-    output = to_keras_tensor(output)  
     model = Model(input = inputs, output = output)
     return model

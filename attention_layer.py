@@ -8,6 +8,7 @@ from keras import backend as K
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
+from keras.engine.topology import merge
 import numpy as np
 
 import logging
@@ -83,22 +84,76 @@ class Attention(Layer):
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         return (input_shape[0], input_shape[2])
 
-# helper functions
-def transform_sequence_to_sequence(input_sequence, output_dim):
-    '''
-    input_sequence: input sequence
-    output_dim: dimension of output vector
-    return encoded sequence 
-    '''
-    check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
-    check_and_throw_if_fail(output_dim > 0 , "output_dim")
-    # TODO: try advanced options, such as drop out, regularizer on parameters
-    encoder_left_to_right = GRU(output_dim, return_sequences = True)
-    h1 = encoder_left_to_right(input_sequence)
-    encoder_right_to_left = GRU(output_dim, return_sequences = True, go_backwards = True)
-    h2 = encoder_right_to_left(input_sequence)
-    h = K.concatenate([h1, h2], 2)
-    return h
+class SequenceToSequenceEncoder(Layer):
+    def __init__(self, output_dim, is_bi_directional  = True, **kwargs):        
+        check_and_throw_if_fail(output_dim > 0 , "output_dim")
+        self.output_dim = output_dim
+        self.is_bi_directional = is_bi_directional
+        super(SequenceToSequenceEncoder, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        '''
+        input_shape: batch_size * time_steps* input_dim
+        '''
+        check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
+        self.encoder_left_to_right = GRU(self.output_dim, return_sequences = True)
+        if self.is_bi_directional:
+            self.encoder_right_to_left = GRU(self.output_dim, return_sequences = True, go_backwards = True)
+        
+    def call(self, x, mask = None):
+        '''
+        x: batch_size * time_steps* input_dim
+        '''
+        check_and_throw_if_fail(K.ndim(x) == 3, "x")
+        h1 =self. encoder_left_to_right(x)
+        if self.is_bi_directional:
+            h2 = self.encoder_right_to_left(x)
+            return K.concatenate([h1, h2], 2)
+        else:
+            return h1
+
+    def get_output_shape_for(self, input_shape):
+        '''
+        input_shape: input shape
+        '''
+        check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
+        if self.is_bi_directional:
+            return  input_shape[:-1] + (2*self.output_dim,)
+        else:
+            return  input_shape[:-1] + (self.output_dim,)
+
+class SequenceToVectorEncoder(Layer):
+    def __init__(self, output_dim, is_bi_directional  = True, **kwargs):        
+        check_and_throw_if_fail(output_dim > 0 , "output_dim")
+        self.output_dim = output_dim
+        super(SequenceToVectorEncoder, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        '''
+        input_shape: batch_size * time_steps* input_dim
+        '''
+        check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
+        self.conv = Convolution1D(self.output_dim, 3, border_mode = 'same')
+        timesteps = input_shape[1]
+        self.pooling = MaxPooling1D(pool_length = timesteps)
+        
+    def call(self, x, mask = None):
+        '''
+        x: batch_size * time_steps* input_dim
+        '''
+        check_and_throw_if_fail(K.ndim(x) == 3, "x")
+        output = self.conv(x)
+        output = self.pooling(output)  # batch_size * 1 * output_dim
+        # to remove the time step dimension
+        return K.squeeze(output, 1)
+
+    def get_output_shape_for(self, input_shape):
+        '''
+        input_shape: input shape
+        '''
+        check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
+        return (input_shape[0],self.output_dim)
+    
 
 def apply_attention_layer_with_sequence_to_sequence_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
     '''
@@ -109,24 +164,9 @@ def apply_attention_layer_with_sequence_to_sequence_encoder(input_sequence, outp
     '''
     check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
     attention_layer = Attention(attention_weight_vector_dim, element_wise_output_transformer)
-    transformed_sequence = transform_sequence_to_sequence(input_sequence, output_dim)
+    sequence_to_sequence_encoder= SequenceToSequenceEncoder(output_dim)
+    transformed_sequence = sequence_to_sequence_encoder(input_sequence)
     return attention_layer(transformed_sequence)
-
-def transform_sequence_to_vector_encoder(input_sequence, output_dim):
-    '''
-    input_sequence: input sequence
-    output_dim: dimension of output vector
-    return encoded vector 
-    '''
-    check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
-    check_and_throw_if_fail(output_dim > 0 , "output_dim")
-    conv = Convolution1D(output_dim, 3, border_mode = 'same')
-    output = conv(input_sequence)
-    timesteps = K.int_shape(input_sequence)[1]
-    pooling = MaxPooling1D(pool_length = timesteps)
-    output = pooling(output)  # batch_size * 1 * output_dim
-    # to remove the time step dimension
-    return K.squeeze(output, 1)
 
 def apply_attention_layer_with_sequence_to_vector_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
     '''
@@ -138,7 +178,7 @@ def apply_attention_layer_with_sequence_to_vector_encoder(input_sequence, output
     check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
     check_and_throw_if_fail(output_dim > 0 , "output_dim")
     attention_layer = Attention(attention_weight_vector_dim, element_wise_output_transformer)
-    transformed_vector = transform_sequence_to_vector_encoder(input_sequence, output_dim)
+    sequence_to_vector_encoder=SequenceToVectorEncoder(output_dim)
+    transformed_vector = sequence_to_vector_encoder(input_sequence)
     attention_vector = attention_layer(input_sequence)
-    return K.concatenate([attention_vector, transformed_vector], axis = 1)
-
+    return merge(inputs=[attention_vector, transformed_vector], mode='concat', concat_axis=-1)
