@@ -5,7 +5,7 @@ Created on Jul 11, 2016
 '''
 import unittest
 from keras.layers import Input
-from attention_layer import Attention, SequenceToSequenceEncoder,SequenceToVectorEncoder,build_hierarchical_attention_model_inputs, apply_attention_layer_with_sequence_to_sequence_encoder,apply_attention_layer_with_sequence_to_vector_encoder
+from attention_layer import Attention, SequenceToSequenceEncoder,SequenceToVectorEncoder,HierarchicalAttention
 from keras import backend as K
 import numpy as np
 
@@ -41,13 +41,13 @@ class AttentionLayerTest(unittest.TestCase):
         output_vector= sequence_to_vector_encoder(x)
         self.assertEqual(K.int_shape(output_vector), (3,20), "output_vector")
  
-    def test_build_hierarchical_attention_model_inputs(self):
+    def test_build_hierarchical_attention_layer_inputs(self):
         # time_steps* documents * sections* sentences * words
         input_shape=(7,8,5,6,9)
         #record, document,section,sentence,word
         input_feature_dims=(20,10,50,60,30)
         #document, section, sentence, word
-        inputs= build_hierarchical_attention_model_inputs(input_shape, input_feature_dims)
+        inputs= HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
 
         self.assertEqual(len(inputs) , len(input_feature_dims)+1, "inputs")
         self.assertEqual( K.int_shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs") #original input
@@ -56,25 +56,29 @@ class AttentionLayerTest(unittest.TestCase):
         self.assertEqual( K.int_shape(inputs[3]), (None, 7, 8, 5, 50), "inputs") #section features
         self.assertEqual( K.int_shape(inputs[4]), (None, 7, 8, 10), "inputs") #document features
         self.assertEqual( K.int_shape(inputs[5]), (None, 7, 20), "inputs") #snapshot features
-           
-    def test_apply_attention_layer_with_sequence_to_sequence_encoder(self):
-        input_shape=(3,5,10)
-        attention_weight_vector_dim = 8
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        output_dim = 20
-        output_vector= apply_attention_layer_with_sequence_to_sequence_encoder(x, output_dim, attention_weight_vector_dim)
-        self.assertEqual(K.int_shape(output_vector), (3,40), "output_vector")
-
-    def test_apply_attention_layer_with_sequence_to_vector_encoder(self):
-        input_shape=(3,5,10)
-        attention_weight_vector_dim = 8
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        output_dim = 20
-        output_vector= apply_attention_layer_with_sequence_to_vector_encoder(x, output_dim, attention_weight_vector_dim)
-        self.assertEqual(K.int_shape(output_vector), (3,10+20), "output_vector")
         
+    def test_hierarchical_attention_layer_inputs(self):
+        # snapshots* documents * sections* sentences * words
+        input_shape=(7,8,5,6,9)
+        #snapshot, document,section,sentence,word
+        input_feature_dims=(20,10,50,60,30)
+        #document, section, sentence, word
+        attention_output_dims=(45,35,25,65)
+        #document, section, sentence, word
+        attention_weight_vector_dims = (82,72,62,52)
+        #embedding
+        embedding_rows = 1024
+        embedding_dim = 50 
+        initial_embedding = np.random.random((embedding_rows,embedding_dim)) 
+        inputs= HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
+        hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)
+        output = hierarchical_attention(inputs)
+        self.assertEqual(K.int_shape(output), (None,7,20+45*2), "output")
+        
+        hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = True)
+        output = hierarchical_attention(inputs)
+        self.assertEqual(K.int_shape(output), (None,7,390), "output")        
+       
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

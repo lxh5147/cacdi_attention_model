@@ -8,7 +8,6 @@ from keras import backend as K
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
-from keras.engine.topology import merge
 from keras.layers import Input
 from keras.layers.embeddings import Embedding
 
@@ -88,6 +87,9 @@ class Attention(Layer):
         return (input_shape[0], input_shape[2])
 
 class SequenceToSequenceEncoder(Layer):
+    '''
+    Represents an encoder that transforms input sequence to another sequence
+    '''
     def __init__(self, output_dim, is_bi_directional  = True, **kwargs):        
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
         self.output_dim = output_dim
@@ -106,6 +108,7 @@ class SequenceToSequenceEncoder(Layer):
     def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
+        returns a tensor of shape batch_size * time_steps * 2*input_dim (or input_dim if not bidirectional)  
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
         h1 =self. encoder_left_to_right(x)
@@ -126,7 +129,10 @@ class SequenceToSequenceEncoder(Layer):
             return  input_shape[:-1] + (self.output_dim,)
 
 class SequenceToVectorEncoder(Layer):
-    def __init__(self, output_dim, is_bi_directional  = True, **kwargs):        
+    '''
+    Represents an encoder that transforms a sequence into a vector 
+    '''
+    def __init__(self, output_dim, **kwargs):        
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
         self.output_dim = output_dim
         super(SequenceToVectorEncoder, self).__init__(**kwargs)
@@ -143,6 +149,7 @@ class SequenceToVectorEncoder(Layer):
     def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
+        Returns a tensor of the shape: batch_size * output_dim
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
         output = self.conv(x)
@@ -157,108 +164,119 @@ class SequenceToVectorEncoder(Layer):
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         return (input_shape[0],self.output_dim)
     
-def build_hierarchical_attention_model_inputs(input_shape, input_feature_dims):
-    inputs = []
-    check_and_throw_if_fail(len(input_shape) >= 2 , "input_shape")
-    check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
-    total_dim = len(input_shape)
-    inputs.append(Input(shape = input_shape,dtype="int32"))
-    # increase one dimension
-    for cur_dim in xrange(total_dim - 1 , -1, -1):
-        inputs.append(Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],)))        
-    return inputs
-
-def apply_attention_layer_with_sequence_to_sequence_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
-    '''
-    input_sequence: input sequence, batch_size*time_steps*input_dim
-    output_dim: dimension of output vector
-    attention_weight_vector_dim: dimension of attention weight vector
-    element_wise_output_transformer: element wise output transformer
-    '''
-    check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
-    attention_layer = Attention(attention_weight_vector_dim, element_wise_output_transformer)
-    sequence_to_sequence_encoder= SequenceToSequenceEncoder(output_dim)
-    transformed_sequence = sequence_to_sequence_encoder(input_sequence)
-    return attention_layer(transformed_sequence)
-
-def apply_attention_layer_with_sequence_to_vector_encoder(input_sequence, output_dim, attention_weight_vector_dim, element_wise_output_transformer = None):
-    '''
-    input_sequence: input sequence, batch_size*time_steps*input_dim
-    sequence_to_vector_encoder: transform the input sequence into a vector
-    attention_weight_vector_dim: dimension of attention weight vector
-    element_wise_output_transformer: element wise output transformer
-    '''
-    check_and_throw_if_fail(K.ndim(input_sequence) == 3 , "input_sequence")
-    check_and_throw_if_fail(output_dim > 0 , "output_dim")
-    attention_layer = Attention(attention_weight_vector_dim, element_wise_output_transformer)
-    sequence_to_vector_encoder=SequenceToVectorEncoder(output_dim)
-    transformed_vector = sequence_to_vector_encoder(input_sequence)
-    attention_vector = attention_layer(input_sequence)
-    return merge(inputs=[attention_vector, transformed_vector], mode='concat', concat_axis=-1)
-
 class HierarchicalAttention(Layer):
     '''
-    Represents hierarchical attention layer
+    Represents a hierarchical attention layer
+    One example: snapshots* documents * sections* sentences * words
     '''
-    def __init__(self, top_feature_dim,   attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, **kwargs):
+    def __init__(self, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder = False,  **kwargs):
+        '''
+        top_feature_dim: dim of the top feature, e.g., the snapshot level feature
+        attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
+        attention_weight_vector_dims: weight vector dimensions inside each attention layer, e.g., section, document, sentence, word
+        use_sequence_to_vector_encoder: True if use sequence to vector encoder otherwise sequence to sequence encoder inside all attention layers
+        '''
         check_and_throw_if_fail(len(attention_output_dims) > 0 , "attention_output_dims")
-        check_and_throw_if_fail(len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")        
+        check_and_throw_if_fail(len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
         self.attention_output_dims = attention_output_dims
         self.attention_weight_vector_dims=attention_weight_vector_dims
         self.embedding_rows = embedding_rows
         self.embedding_dim = embedding_dim
-        self.initial_embedding= initial_embedding
-        self.top_feature_dim = top_feature_dim
+        self.initial_embedding= initial_embedding        
+        self.use_sequence_to_vector_encoder = use_sequence_to_vector_encoder
         super(HierarchicalAttention, self).__init__(**kwargs)
 
-    def build(self, input_shape):
+    def build(self, input_shapes):
         '''
-        input_shape: batch_size* time_steps* documents * sections* sentences * words
+        input_shapes[0]: batch_size* snapshots* documents * sections* sentences * words
+        input_shapes[1]: batch_size*snapshots* documents * sections* sentences * words* word_input_feature
+        ...
+        input_shapes[5]:batch_size*snapshots*snapshot_input_feature
         '''
-        check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
-        check_and_throw_if_fail(len(self.attention_output_dims) == len(input_shape) - 2 , "output_dims")
+        input_shape=input_shapes[0]
         self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights = [self.initial_embedding])
         self.attention_layers=[]
         self.encoder_layers=[]
         total_dim = len(input_shape)
+        #low level to high level
         for cur_dim in xrange(total_dim - 1 , 1, -1):    
             cur_output_dim = self.attention_output_dims[cur_dim - 2]
             attention_weight_vector_dim = self.attention_weight_vector_dims[cur_dim - 2]
             attetion_layer, encoder_layer = self.create_attention_layer(attention_weight_vector_dim, cur_output_dim)
             self.attention_layers.append(attetion_layer)
-            self.encoder_layers.append(SequenceToVectorEncoder(encoder_layer) )
+            self.encoder_layers.append(encoder_layer)
     
     def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim):
-        return Attention(attention_weight_vector_dim), SequenceToVectorEncoder(cur_output_dim)
+        if self.use_sequence_to_vector_encoder:
+            return Attention(attention_weight_vector_dim), SequenceToVectorEncoder(cur_output_dim)
+        else:
+            return Attention(attention_weight_vector_dim), SequenceToSequenceEncoder(cur_output_dim)
 
     def call_attention_layer(self, input_sequence, attention_layer, encoder_layer):
-        return attention_layer(encoder_layer(input_sequence))
+        if self.use_sequence_to_vector_encoder:
+                transformed_vector = encoder_layer(input_sequence)
+                attention_vector = attention_layer(input_sequence)
+                return K.concatenate([attention_vector, transformed_vector], axis=-1)
+        else:
+            return attention_layer(encoder_layer(input_sequence))
     
-    def get_output_dim(self):
-        return self.top_feature_dim + self.attention_output_dims[-1]*2
-    
+    def get_output_dim(self,input_shapes):
+        if self.use_sequence_to_vector_encoder:
+            #input_feature_dim  attention_outpout_dim + next layer output_dim
+            output_dim = sum(self.attention_output_dims)            
+            for input_shape in input_shapes[1:]:
+                output_dim += input_shape[-1]
+            output_dim += self.embedding_dim
+            return output_dim 
+        else:
+            return input_shapes[-1][-1] + self.attention_output_dims[-1]*2
+        
+    @staticmethod
+    def build_inputs(input_shape, input_feature_dims):
+        '''
+        input_shape: input shape, e.g., snapshots* documents * sections* sentences * words
+        input_feature_dims: input feature dims, first one being the dim of top level feature, and last being the dim of the most low level feature 
+        return inputs, first one being the most fine-grained/low level input, and last being the most coarse/high level input
+        '''
+        inputs = []
+        check_and_throw_if_fail(len(input_shape) >= 2 , "input_shape")
+        check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
+        total_dim = len(input_shape)
+        #The shape parameter of an Input does not include the first batch_size dimension
+        inputs.append(Input(shape = input_shape,dtype="int32"))
+        # for each level, create an input
+        for cur_dim in xrange(total_dim - 1 , -1, -1):
+            inputs.append(Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],)))        
+        return inputs
+   
     def call(self, inputs, mask = None):
         '''
-        inputs: a list of inputs
+        inputs: a list of inputs; the first layer is lowest level sequence, second layer lowest level input features, ..., the top level input features
+        returns a tensor of shape: batch_size*snapshots*output_dim
         '''
         check_and_throw_if_fail(type(inputs) is  list and len(inputs) == 2 + len(self.attention_layers) , "inputs")        
         output  = self.embedding(inputs[0])
-        i=-2
+        i=1
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             output = K.concatenate([output, inputs[i]], axis=-1)
             cur_output_shape=K.int_shape(output)
             output = K.reshape(output, shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
             output = self.call_attention_layer(output,attention_layer,encoder_layer)
             output = K.reshape(output, shape=(-1,) +  cur_output_shape[1:-2] + (K.int_shape(output)[1],))
-            i-=1
+            i+=1
     
         # output: batch_size*time_steps*cacdi_snapshot_attention
-        output = K.concatenate ([output, inputs[0]],axis=-1)
+        output = K.concatenate ([output, inputs[-1]],axis=-1)
         return output
 
-    def get_output_shape_for(self, input_shape):
+    def get_output_shape_for(self, input_shapes):
         '''
-        input_shape: input shape
+        input_shapes[0]: batch_size* snapshots* documents * sections* sentences * words
+        input_shapes[1]: batch_size*snapshots* documents * sections* sentences * words* word_input_feature
+        ...
+        input_shapes[5]:batch_size*snapshots*snapshot_input_feature
         '''
+        input_shape=input_shapes[0]
         check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
-        return input_shape[:2] + (self.get_output_dim(), )
+        return input_shape[:2] + (self.get_output_dim(input_shapes), )
+
