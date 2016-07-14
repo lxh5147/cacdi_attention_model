@@ -51,7 +51,7 @@ class AttentionModelTest(unittest.TestCase):
         self.assertEqual( K.int_shape(inputs[5]), (None, 7, 20), "inputs") #snapshot features
         #check output of model
         self.assertEqual(len(model.outputs), 1, "model")
-        self.assertEqual(K.int_shape(model.outputs[0]), (None, 100), "y")
+        self.assertEqual(K.int_shape(model.outputs[0]), (None, 7,100), "y")
         
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

@@ -68,7 +68,7 @@ class AttentionLayerTest(unittest.TestCase):
         attention_weight_vector_dims = (82,72,62,52)
         #embedding
         embedding_rows = 1024
-        embedding_dim = 50 
+        embedding_dim = 50
         initial_embedding = np.random.random((embedding_rows,embedding_dim)) 
         inputs= HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
         hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)

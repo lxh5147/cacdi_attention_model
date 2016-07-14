@@ -7,7 +7,7 @@ Created on Jul 5, 2016
 from keras import backend as K
 from keras.layers import Dense, Dropout, Activation
 from keras.layers.wrappers import TimeDistributed
-from attention_layer import check_and_throw_if_fail,reshape,  HierarchicalAttention 
+from attention_layer import check_and_throw_if_fail, HierarchicalAttention 
 from keras.models import Model
 import logging
 
@@ -36,8 +36,6 @@ def build_classifier_with_hierarchical_attention(input_shape, input_feature_dims
     inputs= HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
     hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder)
     output = hierarchical_attention(inputs)
-    output = apply_mlp_softmax_classifier(output, output_dim, hidden_unit_numbers, drop_out_rates)
-    output_shape=K.int_shape(output)
-    output = reshape(output, target_shape=(-1,output_shape[-1]))
+    output = apply_mlp_softmax_classifier(output, output_dim, hidden_unit_numbers, drop_out_rates)    
     model = Model(input = inputs, output = output)
     return model
