@@ -26,6 +26,26 @@ def check_and_throw_if_fail(condition, msg):
         logger.error(msg)
         raise Exception(msg)
 
+def reshape(x, target_shape):
+    '''
+    Helper function that performs reshape on a tensor
+    '''
+    class _ReshapeLayer(Layer):
+        '''
+        Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
+        '''
+        def __init__(self, target_shape, **kwargs):
+            self.target_shape = target_shape
+            super(_ReshapeLayer, self).__init__(**kwargs)
+    
+        def call(self, x, mask = None):
+            return K.reshape(x, self.target_shape)
+        
+        def get_output_shape_for(self, input_shape):
+            return self.target_shape
+        
+    return _ReshapeLayer(target_shape=target_shape)(x)
+
 class Attention(Layer):
     '''
     Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
