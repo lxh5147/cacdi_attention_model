@@ -249,7 +249,8 @@ class HierarchicalAttention(Layer):
             output_dim += self.embedding_dim
             return output_dim 
         else:
-            return input_shapes[-1][-1] + self.attention_output_dims[-1]*2
+            #last input is the top level input feature; the first in the attention output dimension is for the top level
+            return input_shapes[-1][-1] + self.attention_output_dims[0]*2
         
     @staticmethod
     def build_inputs(input_shape, input_feature_dims):
@@ -261,12 +262,15 @@ class HierarchicalAttention(Layer):
         inputs = []
         check_and_throw_if_fail(len(input_shape) >= 2 , "input_shape")
         check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
-        total_dim = len(input_shape)
+        total_level = len(input_shape)
         #The shape parameter of an Input does not include the first batch_size dimension
         inputs.append(Input(shape = input_shape,dtype="int32"))
         # for each level, create an input
-        for cur_dim in xrange(total_dim - 1 , -1, -1):
-            inputs.append(Input(shape = input_shape[:cur_dim + 1] + (input_feature_dims[cur_dim],)))        
+        for cur_level in xrange(total_level - 1 , -1, -1):
+            if input_feature_dims[cur_level] > 0:
+                tensor_input = Input(shape = input_shape[:cur_level + 1] + (input_feature_dims[cur_level],))
+                tensor_input._level = cur_level                
+                inputs.append(tensor_input)
         return inputs
    
     def call(self, inputs, mask = None):
@@ -274,19 +278,24 @@ class HierarchicalAttention(Layer):
         inputs: a list of inputs; the first layer is lowest level sequence, second layer lowest level input features, ..., the top level input features
         returns a tensor of shape: batch_size*snapshots*output_dim
         '''
-        check_and_throw_if_fail(type(inputs) is  list and len(inputs) == 2 + len(self.attention_layers) , "inputs")        
+        check_and_throw_if_fail(type(inputs) is  list and len(inputs) <= 2 + len(self.attention_layers) , "inputs")
         output  = self.embedding(inputs[0])
-        i=1
+        level_to_input={}
+        for tensor_input in inputs[1:]:
+            check_and_throw_if_fail(hasattr(tensor_input, '_level'),"an input must have _level property")
+            level_to_input[tensor_input._level] = tensor_input
+        cur_level = len (self.attention_layers)
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
-            output = K.concatenate([output, inputs[i]], axis=-1)
+            if cur_level in level_to_input:
+                output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
             cur_output_shape=K.int_shape(output)
             output = K.reshape(output, shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
             output = self.call_attention_layer(output,attention_layer,encoder_layer)
             output = K.reshape(output, shape=(-1,) +  cur_output_shape[1:-2] + (K.int_shape(output)[1],))
-            i+=1
-    
+            cur_level -= 1    
         # output: batch_size*time_steps*cacdi_snapshot_attention
-        output = K.concatenate ([output, inputs[-1]],axis=-1)
+        if cur_level in level_to_input:
+            output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
         return output
 
     def get_output_shape_for(self, input_shapes):

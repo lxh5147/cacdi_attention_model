@@ -24,23 +24,33 @@ class AttentionLayerTest(unittest.TestCase):
         self.assertEqual( hasattr(y, '_keras_history'),True, "y")
 
     def test_transform_sequence_to_sequence(self):
-        input_shape=(3,5,10)
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
+        tensor_input = Input(shape=(5,10))
         output_dim = 20
         sequence_to_sequence_encoder = SequenceToSequenceEncoder(output_dim)
-        output_sequence= sequence_to_sequence_encoder(x)
-        self.assertEqual(K.int_shape(output_sequence), (3,5,40), "output_sequence")
-    
-    def test_transform_sequence_to_vector_encoder(self):
+        output_sequence= sequence_to_sequence_encoder(tensor_input)
+        self.assertEqual(K.int_shape(output_sequence), (None,5,40), "output_sequence")
+        self.assertEqual(output_sequence._keras_shape, (None,5,40), "output_sequence")
+        #test with a variable
         input_shape=(3,5,10)
         xval = np.random.random(input_shape) - 0.5
         x = K.variable(xval)
+        output_sequence= sequence_to_sequence_encoder(x)
+        self.assertEqual(K.int_shape(output_sequence), (3,5,40), "output_sequence")
+        
+    def test_transform_sequence_to_vector_encoder(self):
         output_dim = 20
         sequence_to_vector_encoder = SequenceToVectorEncoder(output_dim)
+        tensor_input = Input(shape=(5,10))
+        output_vector= sequence_to_vector_encoder(tensor_input)
+        self.assertEqual(K.int_shape(output_vector), (None,20), "output_vector")
+        self.assertEqual(output_vector._keras_shape, (None,20), "output_vector")
+        input_shape=(3,5,10)
+        #test with a variable
+        xval = np.random.random(input_shape) - 0.5
+        x = K.variable(xval)
         output_vector= sequence_to_vector_encoder(x)
         self.assertEqual(K.int_shape(output_vector), (3,20), "output_vector")
- 
+        
     def test_build_hierarchical_attention_layer_inputs(self):
         # time_steps* documents * sections* sentences * words
         input_shape=(7,8,5,6,9)
@@ -74,11 +84,14 @@ class AttentionLayerTest(unittest.TestCase):
         hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)
         output = hierarchical_attention(inputs)
         self.assertEqual(K.int_shape(output), (None,7,20+45*2), "output")
-        
+        #this is to test the get_output_shape_for method
+        self.assertEqual(output._keras_shape, (None,7,20+45*2), "output")        
         hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = True)
         output = hierarchical_attention(inputs)
-        self.assertEqual(K.int_shape(output), (None,7,390), "output")        
-       
+        self.assertEqual(K.int_shape(output), (None,7,390), "output")
+        #this is to test the get_output_shape_for method      
+        self.assertEqual(output._keras_shape, (None,7,390), "output")        
+         
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

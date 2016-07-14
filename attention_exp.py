@@ -9,8 +9,10 @@ from keras import backend as K
 import numpy as np
 from keras.layers import Input
 import tensorflow as tf
-sess = tf.Session()
-K.set_session(sess)
+
+K.set_session(tf.Session())
+sess = K.get_session()
+
               
 def fake_data(input_shape, dtype='float32', max_int=10): 
     val = np.random.random(input_shape)
@@ -67,7 +69,7 @@ def debug_attention_layer():
     for i in range(len(inputs)):
         feed_dict[inputs[i]] = x_train[i]
     feed_dict[K.learning_phase()] = 1
-    tf.initialize_all_variables()
+    #tf.initialize_all_variables()
     #y_out is fine 2,7, 110
     y_out = sess.run(output, feed_dict=feed_dict) 
     check_and_throw_if_fail(y_out.shape==(2,7,110),"y_out")
@@ -84,7 +86,7 @@ def debug_softmax_layer():
     feed_dict = {}
     feed_dict[input_sequence] = np.random.random((total,) + K.int_shape(input_sequence)[1:] )
     feed_dict[K.learning_phase()] = 1
-    tf.initialize_all_variables()
+    #tf.initialize_all_variables()
     #y_out is fine 2,7, 110
     y_out = sess.run(output, feed_dict=feed_dict) 
     check_and_throw_if_fail(y_out.shape==(total, K.int_shape(input_sequence)[1], output_dim ) ,"y_out")
@@ -101,13 +103,16 @@ def debug_attention_with_classifier_layer():
     embedding_rows = 200
     embedding_dim = 50
     output_dim = 5
-    hidden_unit_numbers=(5, 20) # 5--> first hidden layer, 20 --> second hidden layer
-    drop_out_rates = ( 0.5, 0.6) 
+    #hidden_unit_numbers=(5, 20) # 5--> first hidden layer, 20 --> second hidden layer
+    #drop_out_rates = ( 0.5, 0.6) 
+    hidden_unit_numbers=() # 5--> first hidden layer, 20 --> second hidden layer
+    drop_out_rates = () 
+    
     #classifier    
     initial_embedding = np.random.random((embedding_rows,embedding_dim))
     inputs= HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
     hierarchical_attention = HierarchicalAttention(attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)
-    output = hierarchical_attention(inputs)    
+    output = hierarchical_attention(inputs)
     output = apply_mlp_softmax_classifier(output, output_dim, hidden_unit_numbers, drop_out_rates)
     total = 2
     timesteps=input_shape[0]          
@@ -118,8 +123,7 @@ def debug_attention_with_classifier_layer():
     for i in range(len(inputs)):
         feed_dict[inputs[i]] = x_train[i]
     feed_dict[K.learning_phase()] = 1
-    tf.initialize_all_variables()
-    #y_out's shape is: 2,7, 110
+
     y_out = sess.run(output, feed_dict=feed_dict) 
     check_and_throw_if_fail(y_out.shape==(total,timesteps,output_dim),"y_out")
     
@@ -163,9 +167,10 @@ def faked_exp():
     total = 2
     x_pred, _ =  faked_dataset(model.inputs, total, timesteps, vocabulary_size,output_dim)
     y_pred= model.predict(x_pred, batch_size=1,  verbose=1)
-    check_and_throw_if_fail(y_pred.shape == (total, output_dim),"y_pred")
+    check_and_throw_if_fail(y_pred.shape == (total, timesteps, output_dim),"y_pred")
        
 if __name__ == '__main__':
-    #faked_exp()
+    faked_exp()
     #debug_softmax_layer()
-    debug_attention_with_classifier_layer()
+    #debug_attention_with_classifier_layer()
+    #debug_attention_layer()
