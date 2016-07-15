@@ -8,6 +8,8 @@ from attention_layer import check_and_throw_if_fail, HierarchicalAttention
 from keras import backend as K
 import numpy as np
 from keras.layers import Input
+from keras.callbacks import EarlyStopping
+
 import tensorflow as tf
 
 K.set_session(tf.Session())
@@ -156,7 +158,7 @@ def faked_exp():
     timesteps=input_shape[0]
     
     x_train, y_train =  faked_dataset(model.inputs, total, timesteps, vocabulary_size,output_dim)
-    model.fit(x_train, y_train,  batch_size, nb_epoch, verbose=1, callbacks=[],
+    model.fit(x_train, y_train,  batch_size, nb_epoch, verbose=1, callbacks=[EarlyStopping(patience=5)],
             validation_split=0., validation_data=None, shuffle=True,
             class_weight=None, sample_weight=None)
     #evaluate
