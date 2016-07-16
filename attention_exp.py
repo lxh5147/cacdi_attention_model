@@ -4,7 +4,7 @@ Created on Jul 13, 2016
 @author: lxh5147
 '''
 from attention_model import  build_classifier_with_hierarchical_attention,apply_mlp_softmax_classifier
-from attention_layer import check_and_throw_if_fail, HierarchicalAttention
+from attention_layer import check_and_throw_if_fail, HierarchicalAttention, shape
 from keras import backend as K
 import numpy as np
 from keras.layers import Input
@@ -36,7 +36,7 @@ def to_binary_matrix(x,max_int):
 def faked_dataset(inputs, total, timesteps, vocabulary_size,output_dim):
     input_vals = []
     for input_tensor in inputs:
-        input_val=fake_data((total,) + K.int_shape(input_tensor)[1:],K.dtype(input_tensor), max_int=vocabulary_size)
+        input_val=fake_data((total,) + shape(input_tensor)[1:],K.dtype(input_tensor), max_int=vocabulary_size)
         input_vals.append(input_val)    
     output_val = fake_data((total, timesteps) , 'int32', max_int=output_dim)
     output_val = output_val.reshape((total*timesteps,))
@@ -86,12 +86,12 @@ def debug_softmax_layer():
     #build feed_dic
     total = 4
     feed_dict = {}
-    feed_dict[input_sequence] = np.random.random((total,) + K.int_shape(input_sequence)[1:] )
+    feed_dict[input_sequence] = np.random.random((total,) + shape(input_sequence)[1:] )
     feed_dict[K.learning_phase()] = 1
     #tf.initialize_all_variables()
     #y_out is fine 2,7, 110
     y_out = sess.run(output, feed_dict=feed_dict) 
-    check_and_throw_if_fail(y_out.shape==(total, K.int_shape(input_sequence)[1], output_dim ) ,"y_out")
+    check_and_throw_if_fail(y_out.shape==(total, shape(input_sequence)[1], output_dim ) ,"y_out")
 
 def debug_attention_with_classifier_layer():
     input_shape=(7,8,5,6,9)
