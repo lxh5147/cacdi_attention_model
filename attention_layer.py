@@ -126,11 +126,7 @@ class Attention(Layer):
         ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs, input_dim=input_dim, output_dim=self.attention_weight_vector_dim, timesteps=time_steps))    # batch_size, time_steps, attention_weight_vector_dim
         ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us, 1), input_dim=self.attention_weight_vector_dim, output_dim=1, timesteps=time_steps))    # batch_size, time_steps, 1
         sum_of_ai = K.sum(ai, 1, keepdims=True)    # batch_size 1 1
-
-        sum_of_ai = K.repeat_elements(sum_of_ai, rep=time_steps, axis=1)    # batch_size time_steps 1
         ai = ai / sum_of_ai    # batch_size * time_steps * 1
-
-        ai = K.repeat_elements(ai, rep=input_dim, axis=2)    # batch_size time_steps input_dim
         # batch_size *time_steps * input_dim -> batch_size* input_dim
         output = K.sum(ai * x, 1)
         if self.element_wise_output_transformer:
