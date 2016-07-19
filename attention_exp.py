@@ -3,7 +3,7 @@ Created on Jul 13, 2016
 
 @author: lxh5147
 '''
-from attention_model import  build_classifier_with_hierarchical_attention, apply_mlp_softmax_classifier
+from attention_model import  build_classifier_with_hierarchical_attention, apply_mlp_softmax_classifier, categorical_crossentropy_ex
 from attention_layer import check_and_throw_if_fail, HierarchicalAttention, shape
 from keras import backend as K
 import numpy as np
@@ -127,7 +127,7 @@ def debug_attention_with_classifier_layer():
     feed_dict[K.learning_phase()] = 1
 
     y_out = sess.run(output, feed_dict=feed_dict)
-    check_and_throw_if_fail(y_out.shape == (total, timesteps, output_dim), "y_out")
+    check_and_throw_if_fail(y_out.shape == (total * timesteps, output_dim), "y_out")
 
 def faked_exp():
     # time_steps* documents * sections* sentences * words
@@ -150,16 +150,16 @@ def faked_exp():
     initial_embedding = np.random.random((vocabulary_size, word_embedding_dim))
     model = build_classifier_with_hierarchical_attention(input_feature_dims[0], input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, drop_out_rates)
     # compile the model
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='rmsprop', loss=categorical_crossentropy_ex, metrics=['accuracy'])
     # train
-    total = 4
+    total = 10
     batch_size = 2
     nb_epoch = 5
     timesteps = input_shape[0]
 
     x_train, y_train = faked_dataset(model.inputs, total, timesteps, vocabulary_size, output_dim)
     model.fit(x_train, y_train, batch_size, nb_epoch, verbose=1, callbacks=[EarlyStopping(patience=5)],
-            validation_split=0., validation_data=None, shuffle=True,
+            validation_split=0.1, validation_data=None, shuffle=True,
             class_weight=None, sample_weight=None)
     # evaluate
     total = 4

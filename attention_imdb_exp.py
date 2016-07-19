@@ -3,7 +3,7 @@ Created on Jul 13, 2016
 
 @author: lxh5147
 '''
-from attention_model import  build_classifier_with_hierarchical_attention
+from attention_model import  build_classifier_with_hierarchical_attention, categorical_crossentropy_ex
 from attention_layer import check_and_throw_if_fail
 import numpy as np
 from keras.callbacks import EarlyStopping
@@ -33,15 +33,15 @@ def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sen
     model = build_classifier_with_hierarchical_attention(input_feature_dims[0], input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding,
                                                          use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates)
     # compile the model
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='rmsprop', loss=categorical_crossentropy_ex, metrics=['accuracy'])
     # train
-    total = 4
+    total = 10
     batch_size = 2
     nb_epoch = 5
     x_train, y_train = faked_dataset(model.inputs, total, timesteps, vocabulary_size, classifier_output_dim)
 
     model.fit(x_train, y_train, batch_size, nb_epoch, verbose=1, callbacks=[EarlyStopping(patience=5)],
-            validation_split=0., validation_data=None, shuffle=True,
+            validation_split=0.1, validation_data=None, shuffle=True,
             class_weight=None, sample_weight=None)
     # evaluate
     total = 4
