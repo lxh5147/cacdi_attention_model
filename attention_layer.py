@@ -228,7 +228,7 @@ class HierarchicalAttention(Layer):
     Represents a hierarchical attention layer
     One example: snapshots* documents * sections* sentences * words
     '''
-    def __init__(self, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder=False, **kwargs):
+    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder=False, **kwargs):
         '''
         top_feature_dim: dim of the top feature, e.g., the snapshot level feature
         attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
@@ -237,12 +237,14 @@ class HierarchicalAttention(Layer):
         '''
         check_and_throw_if_fail(len(attention_output_dims) > 0 , "attention_output_dims")
         check_and_throw_if_fail(len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
+        check_and_throw_if_fail(top_level_input_feature_dim >= 0 , "top_level_input_feature_dim")
         self.attention_output_dims = attention_output_dims
         self.attention_weight_vector_dims = attention_weight_vector_dims
         self.embedding_rows = embedding_rows
         self.embedding_dim = embedding_dim
         self.initial_embedding = initial_embedding
         self.use_sequence_to_vector_encoder = use_sequence_to_vector_encoder
+        self.top_level_input_feature_dim = top_level_input_feature_dim
         super(HierarchicalAttention, self).__init__(**kwargs)
 
     def build(self, input_shapes):
@@ -252,6 +254,8 @@ class HierarchicalAttention(Layer):
         ...
         input_shapes[5]:batch_size*snapshots*snapshot_input_feature
         '''
+        if not  type(input_shapes) is  list:
+            input_shapes = [input_shapes]
         input_shape = input_shapes[0]
         self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights=[self.initial_embedding])
         self.attention_layers = []
@@ -289,7 +293,7 @@ class HierarchicalAttention(Layer):
             return output_dim
         else:
             # last input is the top level input feature; the first in the attention output dimension is for the top level
-            return input_shapes[-1][-1] + self.attention_output_dims[0] * 2
+            return self.top_level_input_feature_dim + self.attention_output_dims[0] * 2
 
     @staticmethod
     def build_inputs(input_shape, input_feature_dims):
@@ -317,12 +321,15 @@ class HierarchicalAttention(Layer):
         inputs: a list of inputs; the first layer is lowest level sequence, second layer lowest level input features, ..., the top level input features
         returns a tensor of shape: batch_size*snapshots*output_dim
         '''
-        check_and_throw_if_fail(type(inputs) is  list and len(inputs) <= 2 + len(self.attention_layers) , "inputs")
+        if not  type(inputs) is  list:
+            inputs = [inputs]
+        check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
         output = self.embedding(inputs[0])
         level_to_input = {}
-        for tensor_input in inputs[1:]:
-            check_and_throw_if_fail(hasattr(tensor_input, '_level'), "an input must have _level property")
-            level_to_input[tensor_input._level] = tensor_input
+        if len(inputs) > 1:
+            for tensor_input in inputs[1:]:
+                check_and_throw_if_fail(hasattr(tensor_input, '_level'), "an input must have _level property")
+                level_to_input[tensor_input._level] = tensor_input
         cur_level = len (self.attention_layers)
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
@@ -344,6 +351,8 @@ class HierarchicalAttention(Layer):
         ...
         input_shapes[5]:batch_size*snapshots*snapshot_input_feature
         '''
+        if not  type(input_shapes) is  list:
+            input_shapes = [input_shapes]
         input_shape = input_shapes[0]
         check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
         return input_shape[:2] + (self.get_output_dim(input_shapes),)

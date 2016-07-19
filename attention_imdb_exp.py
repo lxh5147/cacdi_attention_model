@@ -1,0 +1,75 @@
+'''
+Created on Jul 13, 2016
+
+@author: lxh5147
+'''
+from attention_model import  build_classifier_with_hierarchical_attention
+from attention_layer import check_and_throw_if_fail
+import numpy as np
+from keras.callbacks import EarlyStopping
+from attention_exp import faked_dataset
+# import tensorflow as tf
+
+# K.set_session(tf.Session())
+# sess = K.get_session()
+
+# x_train, y_train, x_test, y_test, x_pred, batch_size, nb_epoch,
+def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim,
+             word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates):
+
+    timesteps = 1
+    # time_steps*  sentences * words
+    input_shape = (timesteps, max_sentences, max_words)
+    # comment,sentence,word
+    input_feature_dims = (0, 0, 0)
+    # sentence, word
+    output_dims = (sentence_output_dim, word_output_dim)
+    # sentence, word
+    attention_weight_vector_dims = (sentence_attention_weight_vec_dim, word_attention_weight_vec_dim)
+    # embedding
+    # classifier
+    use_sequence_to_vector_encoder = False
+
+    model = build_classifier_with_hierarchical_attention(input_feature_dims[0], input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding,
+                                                         use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates)
+    # compile the model
+    model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    # train
+    total = 4
+    batch_size = 2
+    nb_epoch = 5
+    x_train, y_train = faked_dataset(model.inputs, total, timesteps, vocabulary_size, classifier_output_dim)
+
+    model.fit(x_train, y_train, batch_size, nb_epoch, verbose=1, callbacks=[EarlyStopping(patience=5)],
+            validation_split=0., validation_data=None, shuffle=True,
+            class_weight=None, sample_weight=None)
+    # evaluate
+    total = 4
+    x_test, y_test = faked_dataset(model.inputs, total, timesteps, vocabulary_size, classifier_output_dim)
+    model.evaluate(x_test, y_test, batch_size=2, verbose=1, sample_weight=None)
+    # predict
+    total = 2
+    x_pred, _ = faked_dataset(model.inputs, total, timesteps, vocabulary_size, classifier_output_dim)
+    y_pred = model.predict(x_pred, batch_size=1, verbose=1)
+    check_and_throw_if_fail(y_pred.shape == (total, timesteps, classifier_output_dim), "y_pred")
+
+
+
+if __name__ == '__main__':
+    max_sentences = 10
+    max_words = 15
+    sentence_output_dim = 25
+    word_output_dim = 18
+    sentence_attention_weight_vec_dim = 5
+    word_attention_weight_vec_dim = 8
+    vocabulary_size = 100
+    word_embedding_dim = 16
+    initial_embedding = np.random.random((vocabulary_size, word_embedding_dim))
+    classifier_output_dim = 20
+    classifier_hidden_unit_numbers = []
+    classifier_drop_out_rates = []
+    imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates)
+
+    # debug_softmax_layer()
+    # debug_attention_with_classifier_layer()
+    # debug_attention_layer()
