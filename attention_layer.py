@@ -6,7 +6,7 @@ Created on Jul 5, 2016
 
 from keras import backend as K
 from keras.engine.topology import Layer
-from keras.layers.recurrent import GRU, time_distributed_dense
+from keras.layers.recurrent import GRU, LSTM, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers import Input
 from keras.layers.embeddings import Embedding
@@ -145,10 +145,11 @@ class SequenceToSequenceEncoder(Layer):
     '''
     Represents an encoder that transforms input sequence to another sequence
     '''
-    def __init__(self, output_dim, is_bi_directional=True, **kwargs):
+    def __init__(self, output_dim, is_bi_directional=True, use_gru=True, **kwargs):
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
         self.output_dim = output_dim
         self.is_bi_directional = is_bi_directional
+        self.use_gru = use_gru
         super(SequenceToSequenceEncoder, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -156,9 +157,16 @@ class SequenceToSequenceEncoder(Layer):
         input_shape: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
-        self.encoder_left_to_right = GRU(self.output_dim, return_sequences=True)
+        if self.use_gru:
+            self.encoder_left_to_right = GRU(self.output_dim, return_sequences=True)
+        else:
+            self.encoder_left_to_right = LSTM (self.output_dim, return_sequences=True)
+
         if self.is_bi_directional:
-            self.encoder_right_to_left = GRU(self.output_dim, return_sequences=True, go_backwards=True)
+            if self.use_gru:
+                self.encoder_right_to_left = GRU(self.output_dim, return_sequences=True, go_backwards=True)
+            else:
+                self.encoder_right_to_left = LSTM(self.output_dim, return_sequences=True, go_backwards=True)
 
     def call(self, x, mask=None):
         '''
