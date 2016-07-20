@@ -195,9 +195,11 @@ class SequenceToVectorEncoder(Layer):
     '''
     Represents an encoder that transforms a sequence into a vector 
     '''
-    def __init__(self, output_dim, **kwargs):
+    def __init__(self, output_dim, window_size=3 , **kwargs):
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
+        check_and_throw_if_fail(window_size > 0 , "window_size")
         self.output_dim = output_dim
+        self.window_size = window_size
         super(SequenceToVectorEncoder, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -205,7 +207,7 @@ class SequenceToVectorEncoder(Layer):
         input_shape: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
-        self.conv = Convolution1D(self.output_dim, 3, border_mode='same')
+        self.conv = Convolution1D(self.output_dim, filter_length=self.window_size, border_mode='same')
         timesteps = input_shape[1]
         self.pooling = MaxPooling1D(pool_length=timesteps)
 
@@ -232,7 +234,7 @@ class HierarchicalAttention(Layer):
     Represents a hierarchical attention layer
     One example: snapshots* documents * sections* sentences * words
     '''
-    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder=False, **kwargs):
+    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder=False, use_cnn_as_sequence_to_sequence_encoder=False, input_window_sizes=None, use_max_pooling_as_attention=False, **kwargs):
         '''
         top_feature_dim: dim of the top feature, e.g., the snapshot level feature
         attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
@@ -240,15 +242,20 @@ class HierarchicalAttention(Layer):
         use_sequence_to_vector_encoder: True if use sequence to vector encoder otherwise sequence to sequence encoder inside all attention layers
         '''
         check_and_throw_if_fail(len(attention_output_dims) > 0 , "attention_output_dims")
-        check_and_throw_if_fail(len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
+        check_and_throw_if_fail(use_max_pooling_as_attention == True or len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
         check_and_throw_if_fail(top_level_input_feature_dim >= 0 , "top_level_input_feature_dim")
+        check_and_throw_if_fail(use_cnn_as_sequence_to_sequence_encoder == False or  input_window_sizes is not None  , "input_window_sizes")
+        check_and_throw_if_fail(input_window_sizes is None or  len(input_window_sizes) == len(attention_output_dims) , "input_window_sizes")
         self.attention_output_dims = attention_output_dims
         self.attention_weight_vector_dims = attention_weight_vector_dims
         self.embedding_rows = embedding_rows
         self.embedding_dim = embedding_dim
         self.initial_embedding = initial_embedding
         self.use_sequence_to_vector_encoder = use_sequence_to_vector_encoder
+        self.use_cnn_as_sequence_to_sequence_encoder = use_cnn_as_sequence_to_sequence_encoder
+        self.input_window_sizes = input_window_sizes
         self.top_level_input_feature_dim = top_level_input_feature_dim
+        self.use_max_pooling_as_attention = use_max_pooling_as_attention
         super(HierarchicalAttention, self).__init__(**kwargs)
 
     def build(self, input_shapes):
@@ -268,16 +275,31 @@ class HierarchicalAttention(Layer):
         # low level to high level
         for cur_dim in xrange(total_dim - 1 , 1, -1):
             cur_output_dim = self.attention_output_dims[cur_dim - 2]
-            attention_weight_vector_dim = self.attention_weight_vector_dims[cur_dim - 2]
-            attetion_layer, encoder_layer = self.create_attention_layer(attention_weight_vector_dim, cur_output_dim)
+            cur_sequence_length = input_shape[cur_dim]
+            if self.use_max_pooling_as_attention:
+                attention_weight_vector_dim = None
+            else:
+                attention_weight_vector_dim = self.attention_weight_vector_dims[cur_dim - 2]
+            if self.use_cnn_as_sequence_to_sequence_encoder:
+                cur_window_size = self.input_window_sizes[cur_dim - 2]
+            else:
+                cur_window_size = None
+            attetion_layer, encoder_layer = self.create_attention_layer(attention_weight_vector_dim, cur_output_dim, cur_sequence_length, cur_window_size)
             self.attention_layers.append(attetion_layer)
             self.encoder_layers.append(encoder_layer)
 
-    def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim):
-        if self.use_sequence_to_vector_encoder:
-            return Attention(attention_weight_vector_dim), SequenceToVectorEncoder(cur_output_dim)
+    def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim, cur_sequence_length, cur_window_size):
+        if self.use_max_pooling_as_attention:
+            attention = MaxPooling1D(pool_length=cur_sequence_length)
         else:
-            return Attention(attention_weight_vector_dim), SequenceToSequenceEncoder(cur_output_dim)
+            attention = Attention(attention_weight_vector_dim)
+        if self.use_sequence_to_vector_encoder:
+            return attention, SequenceToVectorEncoder(cur_output_dim)
+        else:
+            if self.use_cnn_as_sequence_to_sequence_encoder:
+                return attention, Convolution1D(cur_output_dim, filter_length=cur_window_size, border_mode='same')
+            else:
+                return attention, SequenceToSequenceEncoder(cur_output_dim)
 
     def call_attention_layer(self, input_sequence, attention_layer, encoder_layer):
         if self.use_sequence_to_vector_encoder:
@@ -297,7 +319,10 @@ class HierarchicalAttention(Layer):
             return output_dim
         else:
             # last input is the top level input feature; the first in the attention output dimension is for the top level
-            return self.top_level_input_feature_dim + self.attention_output_dims[0] * 2
+            if self.use_cnn_as_sequence_to_sequence_encoder:
+                return self.top_level_input_feature_dim + self.attention_output_dims[0]
+            else:
+                return self.top_level_input_feature_dim + self.attention_output_dims[0] * 2
 
     @staticmethod
     def build_inputs(input_shape, input_feature_dims):
