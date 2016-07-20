@@ -17,19 +17,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def shape(x):
+    if hasattr(x, '_keras_shape'):
+        return x._keras_shape
+    elif hasattr(K, 'int_shape'):
+        return K.int_shape(x)
+    else:
+        raise Exception('You tried to shape on "' + x.name + '". This tensor has no information  about its expected input shape,')
+
 if K._BACKEND == 'theano':
     def  unpack(x):
-        return [x[i] for i in range(x.shape()[0])]
-
-    def shape(x):
-        return x.shape()
+        return [x[i] for i in range(shape(x)[0])]
 
 elif K._BACKEND == 'tensorflow':
     import tensorflow as tf
     def  unpack(x):
         return tf.unpack(x)
-    def shape(x):
-        return tuple([i.__int__() for i in x.get_shape()])
 
 
 def check_and_throw_if_fail(condition, msg):
