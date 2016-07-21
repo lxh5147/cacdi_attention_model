@@ -8,8 +8,10 @@ from keras import backend as K
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, LSTM, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
-from keras.layers import Input
+from keras.layers import Input, BatchNormalization
 from keras.layers.embeddings import Embedding
+from keras.layers import Dense, Activation
+from keras.layers.wrappers import TimeDistributed
 
 import numpy as np
 
@@ -19,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 def shape(x):
     if hasattr(x, '_keras_shape'):
-        return x._keras_shape
+        return  x._keras_shape
     elif hasattr(K, 'int_shape'):
         return K.int_shape(x)
     else:
-        raise Exception('You tried to shape on "' + x.name + '". This tensor has no information  about its expected input shape,')
+        raise Exception('You tried to shape on "' + x.name + '". This tensor has no information  about its expected input shape.')
 
 if K._BACKEND == 'theano':
     def  unpack(x):
@@ -312,6 +314,16 @@ class HierarchicalAttention(Layer):
         else:
             return attention_layer(encoder_layer(input_sequence))
 
+    def get_attention_output_dim(self, input_shape):
+        if self.use_sequence_to_vector_encoder:
+            output_shape_1 = self.encoder_layer.get_output_shape_for(input_shape)
+            output_shape_2 = self.attention_layer.get_output_shape_for(input_shape)
+            return output_shape_1[:-1] + (output_shape_1[-1] + output_shape_2[-1],)
+        else:
+            output_shape_1 = self.encoder_layer.get_output_shape_for(input_shape)
+            output_shape_2 = self.attention_layer.get_output_shape_for(output_shape_1)
+            return output_shape_2
+
     def get_output_dim(self, input_shapes):
         if self.use_sequence_to_vector_encoder:
             # input_feature_dim  attention_outpout_dim + next layer output_dim
@@ -356,7 +368,9 @@ class HierarchicalAttention(Layer):
         if not  type(inputs) is  list:
             inputs = [inputs]
         check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
+        cur_output_shape = list(shape(inputs[0]))
         output = self.embedding(inputs[0])
+        cur_output_shape += (self.embedding_dim,)
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -366,14 +380,19 @@ class HierarchicalAttention(Layer):
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
                 output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
-            cur_output_shape = shape(output)
+                cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
             output = K.reshape(output, shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
+            output._keras_shape = (None, cur_output_shape[-2], cur_output_shape[-1])
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            output = K.reshape(output, shape=(-1,) + cur_output_shape[1:-2] + (shape(output)[1],))
+            cur_output_shape = cur_output_shape[:-2] + [shape(output)[1]]
+            output = K.reshape(output, shape=tuple([-1] + cur_output_shape[1:]))
+            output._keras_shape = tuple(cur_output_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
         if cur_level in level_to_input:
             output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
+            cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
+            output._keras_shape = tuple(cur_output_shape)
         return output
 
     def get_output_shape_for(self, input_shapes):
@@ -388,4 +407,88 @@ class HierarchicalAttention(Layer):
         input_shape = input_shapes[0]
         check_and_throw_if_fail(len(input_shape) >= 3, "input_shape")
         return input_shape[:2] + (self.get_output_dim(input_shapes),)
+
+class MLPClassifierLayer(Layer):
+    '''
+    Represents a mlp classifier, which consists of several hidden layers followed by a softmax output layer
+    '''
+    def __init__(self, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function='softmax', **kwargs):
+        '''
+        input_sequence: input sequence, batch_size * time_steps * input_dim
+        hidden_unit_numbers: number of hidden units of each hidden layer
+        hidden_unit_activation_functions: activation function of hidden layers
+        output_dim: output dimension
+        returns a tensor of shape: batch_size*time_steps*output_dim
+        '''
+        check_and_throw_if_fail(output_dim > 0 , "output_dim")
+        check_and_throw_if_fail(len(hidden_unit_numbers) == len(hidden_unit_activation_functions) , "hidden_unit_numbers")
+        self.output_dim = output_dim
+        self.hidden_unit_numbers = hidden_unit_numbers
+        self.hidden_unit_activation_functions = hidden_unit_activation_functions
+        self.output_activation_function = output_activation_function
+        if hidden_unit_numbers:
+            self.uses_learning_phase = True
+        super(MLPClassifierLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self._layers = []
+        ndim = len(input_shape)
+        for hidden_unit_number, hidden_unit_activation_function in zip(self.hidden_unit_numbers, self.hidden_unit_activation_functions):
+            dense = Dense(hidden_unit_number)
+            activation = Activation(hidden_unit_activation_function)
+            norm = BatchNormalization()
+            if ndim == 3:
+                dense = TimeDistributed(dense)
+                activation = TimeDistributed(activation)
+            self._layers.append(dense)
+            self._layers.append(activation)
+            self._layers.append(norm)
+
+        dense = Dense(self.output_dim)
+        activation = Activation(self.output_activation_function)
+        if ndim == 3:
+            dense = TimeDistributed(dense)
+            activation = TimeDistributed(activation)
+        self._layers.append(dense)
+        self._layers.append(activation)
+
+    def call(self, x, mask=None):
+        output = x
+        for layer in self._layers:
+            output = layer(output)
+        return output
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape[:-1] + (self.output_dim,)
+
+class ClassifierWithHierarchicalAttention(Layer):
+    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim,
+                 initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function='softmax', **kwargs):
+        self.top_level_input_feature_dim = top_level_input_feature_dim
+        self.attention_output_dims = attention_output_dims
+        self.attention_weight_vector_dims = attention_weight_vector_dims
+        self.embedding_rows = embedding_rows
+        self.embedding_dim = embedding_dim
+        self.initial_embedding = initial_embedding
+        self.use_sequence_to_vector_encoder = use_sequence_to_vector_encoder
+        self.output_dim = output_dim
+        self.hidden_unit_numbers = hidden_unit_numbers
+        self.hidden_unit_activation_functions = hidden_unit_activation_functions
+        self. output_activation_function = output_activation_function
+        if hidden_unit_numbers:
+            self.uses_learning_phase = True
+        super(ClassifierWithHierarchicalAttention, self).__init__(**kwargs)
+
+    def build(self, input_shapes):
+        self.hierarchical_attention = HierarchicalAttention(self.top_level_input_feature_dim, self.attention_output_dims, self.attention_weight_vector_dims,
+                                                              self.embedding_rows, self.embedding_dim, self.initial_embedding, self.use_sequence_to_vector_encoder)
+        self.mlp_softmax_classifier = MLPClassifierLayer(self.output_dim, self.hidden_unit_numbers, self.hidden_unit_activation_functions, self. output_activation_function)
+
+    def call(self, inputs, mask=None):
+        output = self.hierarchical_attention(inputs)
+        output = self.mlp_softmax_classifier(output)
+        return output
+
+    def get_output_shape_for(self, input_shapes):
+        return self.hierarchical_attention.get_output_shape_for(input_shapes)[:-1] + (self.output_dim,)
 

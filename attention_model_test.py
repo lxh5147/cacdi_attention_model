@@ -4,22 +4,12 @@ Created on Jul 11, 2016
 @author: lxh5147
 '''
 import unittest
-from attention_model import  apply_mlp_softmax_classifier, build_classifier_with_hierarchical_attention
+from attention_model import   build_classifier_with_hierarchical_attention
 from attention_layer import shape
-from keras import backend as K
 import numpy as np
 
 class AttentionModelTest(unittest.TestCase):
 
-    def test_apply_mlp_softmax_classifier(self):
-        input_shape = (3, 5, 10)
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        output_dim = 100
-        hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
-        drop_out_rates = (0.5, 0.6)
-        y = apply_mlp_softmax_classifier(x, output_dim, hidden_unit_numbers, drop_out_rates)
-        self.assertEqual(shape(y), (3, 5, 100), "y")
 
     def test_build_hierarchical_attention_model(self):
         # time_steps* documents * sections* sentences * words
@@ -36,11 +26,11 @@ class AttentionModelTest(unittest.TestCase):
         # classifier
         output_dim = 100
         hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
-        drop_out_rates = (0.5, 0.6)
+        hidden_unit_activation_functions = ("relu", "relu")
         use_sequence_to_vector_encoder = False
 
         initial_embedding = np.random.random((vocabulary_size, word_embedding_dim))
-        model = build_classifier_with_hierarchical_attention(input_feature_dims[0], input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, drop_out_rates)
+        model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions)
         # check inputs of model
         inputs = model.inputs
         self.assertEqual(len(inputs) , len(input_feature_dims) + 1, "inputs")

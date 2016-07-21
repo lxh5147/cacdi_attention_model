@@ -9,14 +9,9 @@ import numpy as np
 from keras.callbacks import EarlyStopping
 from attention_exp import faked_dataset
 from keras.optimizers import SGD
-# import tensorflow as tf
 
-# K.set_session(tf.Session())
-# sess = K.get_session()
-
-# x_train, y_train, x_test, y_test, x_pred, batch_size, nb_epoch,
 def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim,
-             word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates):
+             word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions):
 
     timesteps = 1
     # time_steps*  sentences * words
@@ -31,8 +26,8 @@ def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sen
     # classifier
     use_sequence_to_vector_encoder = False
 
-    model = build_classifier_with_hierarchical_attention(input_feature_dims[0], input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding,
-                                                         use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates)
+    model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding,
+                                                         use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions)
     # compile the model
     model.compile(optimizer=SGD(momentum=0.9)   , loss=categorical_crossentropy_ex, metrics=['accuracy'])
     # train
@@ -72,9 +67,7 @@ if __name__ == '__main__':
     initial_embedding = np.random.random((vocabulary_size, word_embedding_dim))
     classifier_output_dim = 20
     classifier_hidden_unit_numbers = []
-    classifier_drop_out_rates = []
+    hidden_unit_activation_functions = []
     # batch size = 64
-    imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, classifier_drop_out_rates)
-    # debug_softmax_layer()
-    # debug_attention_with_classifier_layer()
-    # debug_attention_layer()
+    imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions)
+
