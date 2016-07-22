@@ -14,14 +14,9 @@ class AttentionLayerTest(unittest.TestCase):
 
     def test_attention(self):
         attention = Attention(attention_weight_vector_dim=5)
-        input_shape = (3, 5, 10)
-        attention.build(input_shape)
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        y = attention(x)
-        self.assertEqual(shape(y), (3, 10), "y")
         x = Input(shape=(5, 10))
         y = attention(x)
+        self.assertEqual(shape(y), (None, 10), "y")
         self.assertEqual(hasattr(y, '_keras_history'), True, "y")
 
     def test_transform_sequence_to_sequence(self):
@@ -75,13 +70,7 @@ class AttentionLayerTest(unittest.TestCase):
         hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder=False)
         output = hierarchical_attention(inputs)
         self.assertEqual(shape(output), (None, 7, 20 + 45 * 2), "output")
-        # this is to test the get_output_shape_for method
-        self.assertEqual(output._keras_shape, (None, 7, 20 + 45 * 2), "output")
-        hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder=True)
-        output = hierarchical_attention(inputs)
-        self.assertEqual(shape(output), (None, 7, 390), "output")
-        # this is to test the get_output_shape_for method
-        self.assertEqual(output._keras_shape, (None, 7, 390), "output")
+
 
     def test_mlp_softmax_classifier(self):
         x = Input(shape=(5, 10))
