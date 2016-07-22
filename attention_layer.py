@@ -8,7 +8,7 @@ from keras import backend as K
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, LSTM, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
-from keras.layers import Input, BatchNormalization
+from keras.layers import Input, BatchNormalization, merge
 from keras.layers.embeddings import Embedding
 from keras.layers import Dense, Activation
 from keras.layers.wrappers import TimeDistributed
@@ -22,10 +22,8 @@ logger = logging.getLogger(__name__)
 def shape(x):
     if hasattr(x, '_keras_shape'):
         return  x._keras_shape
-    elif hasattr(K, 'int_shape'):
-        return K.int_shape(x)
     else:
-        raise Exception('You tried to shape on "' + x.name + '". This tensor has no information  about its expected input shape.')
+        raise Exception('You tried to shape on a non-keras tensor "' + x.name + '". This tensor has no information  about its expected input shape.')
 
 if K._BACKEND == 'theano':
     def  unpack(x):
@@ -67,7 +65,6 @@ def build_bi_directional_layer(left_to_right, right_to_left):
 
     check_and_throw_if_fail(K.ndim(left_to_right) >= 3 , "left_to_right")
     check_and_throw_if_fail(K.ndim(right_to_left) == K.ndim(left_to_right) , "right_to_left")
-    check_and_throw_if_fail(shape(right_to_left)[:-1] == shape(left_to_right)[:-1] , "right_to_left")
     return BiDirectionalLayer()([left_to_right, right_to_left])
 
 def reshape(x, target_shape):
@@ -86,7 +83,10 @@ def reshape(x, target_shape):
             return K.reshape(x, self.target_shape)
 
         def get_output_shape_for(self, input_shape):
-            return self.target_shape
+            first = self.target_shape[0]
+            if first == -1:
+                first = None
+            return (first,) + self.target_shape[1:]
 
     return ReshapeLayer(target_shape=target_shape)(x)
 
@@ -182,7 +182,7 @@ class SequenceToSequenceEncoder(Layer):
         h1 = self. encoder_left_to_right(x)
         if self.is_bi_directional:
             h2 = self.encoder_right_to_left(x)
-            return build_bi_directional_layer(h1, h2)
+            return  build_bi_directional_layer(h1, h2)
         else:
             return h1
 
@@ -371,6 +371,7 @@ class HierarchicalAttention(Layer):
         cur_output_shape = list(shape(inputs[0]))
         output = self.embedding(inputs[0])
         cur_output_shape += (self.embedding_dim,)
+        output = reshape (output, target_shape=(-1,) + tuple(cur_output_shape[1:]))
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -379,20 +380,17 @@ class HierarchicalAttention(Layer):
         cur_level = len (self.attention_layers)
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
-                output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
+                output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
                 cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
-            output = K.reshape(output, shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
-            output._keras_shape = (None, cur_output_shape[-2], cur_output_shape[-1])
+            output = reshape(output, target_shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
             cur_output_shape = cur_output_shape[:-2] + [shape(output)[1]]
-            output = K.reshape(output, shape=tuple([-1] + cur_output_shape[1:]))
-            output._keras_shape = tuple(cur_output_shape)
+            output = reshape(output, target_shape=tuple([-1] + cur_output_shape[1:]))
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
         if cur_level in level_to_input:
-            output = K.concatenate([output, level_to_input[cur_level]], axis=-1)
+            output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
             cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
-            output._keras_shape = tuple(cur_output_shape)
         return output
 
     def get_output_shape_for(self, input_shapes):

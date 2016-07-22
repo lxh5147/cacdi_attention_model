@@ -31,12 +31,7 @@ class AttentionLayerTest(unittest.TestCase):
         output_sequence = sequence_to_sequence_encoder(tensor_input)
         self.assertEqual(shape(output_sequence), (None, 5, 40), "output_sequence")
         self.assertEqual(output_sequence._keras_shape, (None, 5, 40), "output_sequence")
-        # test with a variable
-        input_shape = (3, 5, 10)
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        output_sequence = sequence_to_sequence_encoder(x)
-        self.assertEqual(shape(output_sequence), (3, 5, 40), "output_sequence")
+
 
     def test_transform_sequence_to_vector_encoder(self):
         output_dim = 20
@@ -45,12 +40,7 @@ class AttentionLayerTest(unittest.TestCase):
         output_vector = sequence_to_vector_encoder(tensor_input)
         self.assertEqual(shape(output_vector), (None, 20), "output_vector")
         self.assertEqual(output_vector._keras_shape, (None, 20), "output_vector")
-        input_shape = (3, 5, 10)
-        # test with a variable
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
-        output_vector = sequence_to_vector_encoder(x)
-        self.assertEqual(shape(output_vector), (3, 20), "output_vector")
+
 
     def test_build_hierarchical_attention_layer_inputs(self):
         # time_steps* documents * sections* sentences * words
@@ -94,15 +84,13 @@ class AttentionLayerTest(unittest.TestCase):
         self.assertEqual(output._keras_shape, (None, 7, 390), "output")
 
     def test_mlp_softmax_classifier(self):
-        input_shape = (3, 5, 10)
-        xval = np.random.random(input_shape) - 0.5
-        x = K.variable(xval)
+        x = Input(shape=(5, 10))
         output_dim = 100
         hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ("relu", "relu")
         mlp_softmax_classifier = MLPClassifierLayer(output_dim, hidden_unit_numbers, hidden_unit_activation_functions)
         y = mlp_softmax_classifier(x)
-        self.assertEqual(shape(y), (3, 5, 100), "y")
+        self.assertEqual(shape(y), (None, 5, 100), "y")
 
     def test_hierarchical_attention_model(self):
         # time_steps* documents * sections* sentences * words
