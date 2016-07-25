@@ -12,7 +12,7 @@ from keras.layers import Input, BatchNormalization, merge
 from keras.layers.embeddings import Embedding
 from keras.layers import Dense
 from keras.layers.wrappers import TimeDistributed
-
+from keras.engine import  InputSpec
 import numpy as np
 
 import logging
@@ -76,12 +76,16 @@ def reshape(x, target_shape):
         '''
         Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
         '''
-        def __init__(self, target_shape, **kwargs):
+        def __init__(self, target_shape, target_tensor_shape=None, ** kwargs):
             self.target_shape = target_shape
+            self.target_tensor_shape = target_tensor_shape
             super(ReshapeLayer, self).__init__(**kwargs)
 
         def call(self, x, mask=None):
-            return K.reshape(x, self.target_shape)
+            if self.target_tensor_shape:
+                return K.reshape(x, self.target_tensor_shape)
+            else:
+                return K.reshape(x, self.target_shape)
 
         def get_output_shape_for(self, input_shape):
             return self.target_shape
@@ -267,6 +271,7 @@ class HierarchicalAttention(Layer):
         if not  type(input_shapes) is  list:
             input_shapes = [input_shapes]
         input_shape = input_shapes[0]
+        self.input_spec = [InputSpec(shape=input_shape)]
         self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights=[self.initial_embedding])
         self.attention_layers = []
         self.encoder_layers = []
@@ -306,7 +311,7 @@ class HierarchicalAttention(Layer):
         if self.use_sequence_to_vector_encoder:
                 transformed_vector = encoder_layer(input_sequence)
                 attention_vector = attention_layer(input_sequence)
-                return K.concatenate([attention_vector, transformed_vector], axis=-1)
+                return merge(inputs=[attention_vector, transformed_vector], mode='concat')
         else:
             return attention_layer(encoder_layer(input_sequence))
 
@@ -365,7 +370,10 @@ class HierarchicalAttention(Layer):
             inputs = [inputs]
         check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
         output = self.embedding(inputs[0])
-        output = reshape (output, output.shape)
+        cur_output_shape = self.input_spec[0].shape + (self.embedding_dim,)
+        # hot fix here embedding bug
+        output._keras_shape = cur_output_shape
+
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -375,11 +383,13 @@ class HierarchicalAttention(Layer):
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
                 output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
-            cur_output_shape = output.shape
+                cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
+            cur_output_tensor_shape = output.shape
             output = reshape(output, target_shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
             cur_output_shape = cur_output_shape[:-2] + (output.shape[1],)
-            output = reshape(output, target_shape=cur_output_shape)
+            cur_output_tensor_shape = cur_output_tensor_shape[:2] + (output.shape[1],)
+            output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
         if cur_level in level_to_input:
