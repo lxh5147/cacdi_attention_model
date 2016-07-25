@@ -322,14 +322,14 @@ class HierarchicalAttention(Layer):
         else:
             return attention_layer(encoder_layer(input_sequence))
 
-    def get_attention_output_dim(self, input_shape):
+    def get_attention_output_dim(self, input_shape, encoder_layer, attention_layer):
         if self.use_sequence_to_vector_encoder:
-            output_shape_1 = self.encoder_layer.get_output_shape_for(input_shape)
-            output_shape_2 = self.attention_layer.get_output_shape_for(input_shape)
+            output_shape_1 = encoder_layer.get_output_shape_for(input_shape)
+            output_shape_2 = attention_layer.get_output_shape_for(input_shape)
             return output_shape_1[:-1] + (output_shape_1[-1] + output_shape_2[-1],)
         else:
-            output_shape_1 = self.encoder_layer.get_output_shape_for(input_shape)
-            output_shape_2 = self.attention_layer.get_output_shape_for(output_shape_1)
+            output_shape_1 = encoder_layer.get_output_shape_for(input_shape)
+            output_shape_2 = attention_layer.get_output_shape_for(output_shape_1)
             return output_shape_2
 
     def get_output_dim(self, input_shapes):
@@ -396,7 +396,7 @@ class HierarchicalAttention(Layer):
             attention_input_shape = (-1, cur_output_shape[-2], cur_output_shape[-1])
             output = reshape(output, target_shape=attention_input_shape)
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            cur_output_shape = cur_output_shape[:-2] + (self.get_attention_output_dim(attention_input_shape)[-1],)
+            cur_output_shape = cur_output_shape[:-2] + (self.get_attention_output_dim(attention_input_shape, encoder_layer=encoder_layer, attention_layer=attention_layer)[-1],)
             cur_output_tensor_shape = cur_output_tensor_shape[:2] + (output.shape[1],)
             output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
             cur_level -= 1
