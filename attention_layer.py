@@ -26,14 +26,15 @@ def shape(x):
         raise Exception('You tried to shape on a non-keras tensor "' + x.name + '". This tensor has no information  about its expected input shape.')
 
 if K._BACKEND == 'theano':
-    def  unpack(x):
-        return [x[i] for i in range(shape(x)[0])]
+    def reverse(x):
+        return x[::-1]
 
 elif K._BACKEND == 'tensorflow':
     import tensorflow as tf
-    def  unpack(x):
-        return tf.unpack(x)
-
+    def reverse(x):
+        x_list=tf.unpack(x)
+        x_list.reverse()
+        return K.pack(x_list)
 
 def check_and_throw_if_fail(condition, msg):
     '''
@@ -55,9 +56,7 @@ def build_bi_directional_layer(left_to_right, right_to_left):
             ndim = K.ndim(right_to_left)
             axes = [1, 0] + list(range(2, ndim))
             right_to_left = K.permute_dimensions(right_to_left, axes)
-            right_to_left_time_step_list = unpack(right_to_left)
-            right_to_left_time_step_list.reverse()
-            right_to_left = K.pack(right_to_left_time_step_list)
+            right_to_left = reverse(right_to_left)
             right_to_left = K.permute_dimensions(right_to_left, axes)
             return K.concatenate([left_to_right, right_to_left], axis=-1)
         def get_output_shape_for(self, input_shapes):
@@ -446,7 +445,7 @@ class MLPClassifierLayer(Layer):
 
     def call(self, x, mask=None):
         output = x
-        for layer in self._layers:
+        for layer in self.layers:
             output = layer(output)
         return output
 
