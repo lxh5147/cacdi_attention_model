@@ -90,7 +90,7 @@ def reshape(x, target_shape, target_tensor_shape=None):
 
         def call(self, x, mask=None):
             if self.target_tensor_shape:
-                return _reshape(x, self.target_tensor_shape, nim=len(self.target_shape))    # required by theano
+                return _reshape(x, self.target_tensor_shape, ndim=len(self.target_shape))    # required by theano
             else:
                 return _reshape(x, self.target_shape)
 
