@@ -365,6 +365,7 @@ class HierarchicalAttention(Layer):
             if input_feature_dims[cur_level] > 0:
                 tensor_input = Input(shape=input_shape[:cur_level + 1] + (input_feature_dims[cur_level],))
                 tensor_input._level = cur_level
+                tensor_input._input_dim = input_feature_dims[cur_level]
                 inputs.append(tensor_input)
         return inputs
 
@@ -390,11 +391,12 @@ class HierarchicalAttention(Layer):
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
                 output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
-                cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
+                cur_output_shape[-1] += level_to_input[cur_level]._input_dim
             cur_output_tensor_shape = output.shape
-            output = reshape(output, target_shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
+            attention_input_shape = (-1, cur_output_shape[-2], cur_output_shape[-1])
+            output = reshape(output, target_shape=attention_input_shape)
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            cur_output_shape = cur_output_shape[:-2] + (output.shape[1],)
+            cur_output_shape = cur_output_shape[:-2] + (self.get_attention_output_dim(attention_input_shape)[-1],)
             cur_output_tensor_shape = cur_output_tensor_shape[:2] + (output.shape[1],)
             output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
             cur_level -= 1
