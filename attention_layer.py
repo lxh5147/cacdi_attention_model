@@ -68,7 +68,7 @@ def build_bi_directional_layer(left_to_right, right_to_left):
     check_and_throw_if_fail(K.ndim(right_to_left) == K.ndim(left_to_right) , "right_to_left")
     return BiDirectionalLayer()([left_to_right, right_to_left])
 
-def reshape(x, target_shape):
+def reshape(x, target_shape, target_tensor_shape=None):
     '''
     Helper function that performs reshape on a tensor
     '''
@@ -90,7 +90,7 @@ def reshape(x, target_shape):
         def get_output_shape_for(self, input_shape):
             return self.target_shape
 
-    return ReshapeLayer(target_shape=target_shape)(x)
+    return ReshapeLayer(target_shape=target_shape, target_tensor_shape=target_tensor_shape)(x)
 
 class Attention(Layer):
     '''
