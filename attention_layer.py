@@ -10,7 +10,7 @@ from keras.layers.recurrent import GRU, LSTM, time_distributed_dense
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers import Input, BatchNormalization, merge
 from keras.layers.embeddings import Embedding
-from keras.layers import Dense, Activation
+from keras.layers import Dense
 from keras.layers.wrappers import TimeDistributed
 
 import numpy as np
@@ -18,6 +18,8 @@ import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
+
+_MAX_SEQUENCE_LENGTH = 100000
 
 def shape(x):
     if hasattr(x, '_keras_shape'):
@@ -32,7 +34,7 @@ if K._BACKEND == 'theano':
 elif K._BACKEND == 'tensorflow':
     import tensorflow as tf
     def reverse(x):
-        x_list=tf.unpack(x)
+        x_list = tf.unpack(x)
         x_list.reverse()
         return K.pack(x_list)
 
@@ -82,10 +84,7 @@ def reshape(x, target_shape):
             return K.reshape(x, self.target_shape)
 
         def get_output_shape_for(self, input_shape):
-            first = self.target_shape[0]
-            if first == -1:
-                first = None
-            return (first,) + self.target_shape[1:]
+            return self.target_shape
 
     return ReshapeLayer(target_shape=target_shape)(x)
 
@@ -123,12 +122,8 @@ class Attention(Layer):
         x: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
-
-        input_dim = shape(x)[2]
-        time_steps = shape(x)[1]
-
-        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs, input_dim=input_dim, output_dim=self.attention_weight_vector_dim, timesteps=time_steps))    # batch_size, time_steps, attention_weight_vector_dim
-        ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us, 1), input_dim=self.attention_weight_vector_dim, output_dim=1, timesteps=time_steps))    # batch_size, time_steps, 1
+        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs))    # batch_size, time_steps, attention_weight_vector_dim
+        ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us, 1), output_dim=1))    # batch_size, time_steps, 1
         sum_of_ai = K.sum(ai, 1, keepdims=True)    # batch_size 1 1
         ai = ai / sum_of_ai    # batch_size * time_steps * 1
         # batch_size *time_steps * input_dim -> batch_size* input_dim
@@ -212,8 +207,8 @@ class SequenceToVectorEncoder(Layer):
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         self.conv = Convolution1D(self.output_dim, filter_length=self.window_size, border_mode='same')
-        timesteps = input_shape[1]
-        self.pooling = MaxPooling1D(pool_length=timesteps)
+
+        self.pooling = MaxPooling1D(pool_length=_MAX_SEQUENCE_LENGTH)
 
     def call(self, x, mask=None):
         '''
@@ -293,6 +288,8 @@ class HierarchicalAttention(Layer):
             self.encoder_layers.append(encoder_layer)
 
     def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim, cur_sequence_length, cur_window_size):
+        if cur_sequence_length is None:
+            cur_sequence_length = _MAX_SEQUENCE_LENGTH
         if self.use_max_pooling_as_attention:
             attention = MaxPooling1D(pool_length=cur_sequence_length)
         else:
@@ -367,10 +364,8 @@ class HierarchicalAttention(Layer):
         if not  type(inputs) is  list:
             inputs = [inputs]
         check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
-        cur_output_shape = list(shape(inputs[0]))
         output = self.embedding(inputs[0])
-        cur_output_shape += (self.embedding_dim,)
-        output = reshape (output, target_shape=(-1,) + tuple(cur_output_shape[1:]))
+        output = reshape (output, output.shape)
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -380,16 +375,15 @@ class HierarchicalAttention(Layer):
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
                 output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
-                cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
+            cur_output_shape = output.shape
             output = reshape(output, target_shape=(-1, cur_output_shape[-2], cur_output_shape[-1]))
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            cur_output_shape = cur_output_shape[:-2] + [shape(output)[1]]
-            output = reshape(output, target_shape=tuple([-1] + cur_output_shape[1:]))
+            cur_output_shape = cur_output_shape[:-2] + (output.shape[1],)
+            output = reshape(output, target_shape=cur_output_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
         if cur_level in level_to_input:
             output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
-            cur_output_shape[-1] += shape(level_to_input[cur_level])[-1]
         return output
 
     def get_output_shape_for(self, input_shapes):
