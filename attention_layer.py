@@ -28,8 +28,12 @@ def shape(x):
         raise Exception('You tried to shape on a non-keras tensor "' + x.name + '". This tensor has no information  about its expected input shape.')
 
 if K._BACKEND == 'theano':
+    from theano import tensor as T
     def reverse(x):
         return x[::-1]
+
+    def _reshape(x, shape, ndim=None):
+        return T.reshape(x, shape, ndim)
 
 elif K._BACKEND == 'tensorflow':
     import tensorflow as tf
@@ -37,6 +41,9 @@ elif K._BACKEND == 'tensorflow':
         x_list = tf.unpack(x)
         x_list.reverse()
         return K.pack(x_list)
+
+    def _reshape(x, shape, ndim=None):
+        return tf.reshape(x, shape)
 
 def check_and_throw_if_fail(condition, msg):
     '''
@@ -83,9 +90,9 @@ def reshape(x, target_shape, target_tensor_shape=None):
 
         def call(self, x, mask=None):
             if self.target_tensor_shape:
-                return K.reshape(x, self.target_tensor_shape)
+                return _reshape(x, self.target_tensor_shape, nim=len(self.target_shape))    # required by theano
             else:
-                return K.reshape(x, self.target_shape)
+                return _reshape(x, self.target_shape)
 
         def get_output_shape_for(self, input_shape):
             return self.target_shape
