@@ -84,7 +84,7 @@ def reshape(x, target_shape, target_tensor_shape=None):
         Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
         '''
         def __init__(self, target_shape, target_tensor_shape=None, ** kwargs):
-            self.target_shape = target_shape
+            self.target_shape = tuple(target_shape)
             self.target_tensor_shape = target_tensor_shape
             super(ReshapeLayer, self).__init__(**kwargs)
 
@@ -378,10 +378,8 @@ class HierarchicalAttention(Layer):
             inputs = [inputs]
         check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
         output = self.embedding(inputs[0])
-        cur_output_shape = self.input_spec[0].shape + (self.embedding_dim,)
-        # hot fix here embedding bug
-        output._keras_shape = cur_output_shape
-
+        cur_output_shape = list(self.input_spec[0].shape + (self.embedding_dim,))
+        output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=inputs[0].shape + (self.embedding_dim,))
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -396,7 +394,7 @@ class HierarchicalAttention(Layer):
             attention_input_shape = (-1, cur_output_shape[-2], cur_output_shape[-1])
             output = reshape(output, target_shape=attention_input_shape)
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            cur_output_shape = cur_output_shape[:-2] + (self.get_attention_output_dim(attention_input_shape, encoder_layer=encoder_layer, attention_layer=attention_layer)[-1],)
+            cur_output_shape = cur_output_shape[:-2] + [self.get_attention_output_dim(attention_input_shape, encoder_layer=encoder_layer, attention_layer=attention_layer)[-1]]
             cur_output_tensor_shape = cur_output_tensor_shape[:2] + (output.shape[1],)
             output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
             cur_level -= 1
