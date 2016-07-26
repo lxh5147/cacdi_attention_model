@@ -10,6 +10,10 @@ from keras import backend as K
 import numpy as np
 from attention_exp import  faked_dataset
 
+def run(outputs,feed_dict):
+    func=K.function(feed_dict.keys(),outputs)
+    return func(feed_dict.values())
+
 class AttentionLayerTest(unittest.TestCase):
 
     def test_attention(self):
@@ -145,7 +149,7 @@ class AttentionLayerTest(unittest.TestCase):
         feed_dict[K.learning_phase()] = 1
         # tf.initialize_all_variables()
         # y_out is fine 2,7, 110
-        y_out = K.get_session().run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict=feed_dict)
         self.assertEquals(y_out.shape , (2, 7, 110), "y_out")
 
     def test_softmax_layer_by_run(self):
@@ -163,7 +167,7 @@ class AttentionLayerTest(unittest.TestCase):
         feed_dict[K.learning_phase()] = 1
         # tf.initialize_all_variables()
         # y_out is fine 2,7, 110
-        y_out = K.get_session().run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict=feed_dict)
         self.assertEqual(y_out.shape , (total, shape(input_sequence)[1], output_dim) , "y_out")
 
     def test_attention_with_classifier_layer_by_run(self):
@@ -201,7 +205,7 @@ class AttentionLayerTest(unittest.TestCase):
             feed_dict[inputs[i]] = x_train[i]
         feed_dict[K.learning_phase()] = 1
 
-        y_out = K.get_session().run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict=feed_dict)
         self.assertEqual(y_out.shape , (total , timesteps, output_dim), "y_out")
 
 if __name__ == "__main__":
