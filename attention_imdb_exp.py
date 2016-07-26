@@ -53,8 +53,10 @@ def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sen
 
 if __name__ == '__main__':
     # http://aclweb.org/anthology/N16-1174
-    max_sentences = 10
-    max_words = 15
+    #max_sentences = 10
+    max_sentences=None
+    #max_words = 15
+    max_words = None
 
     sentence_output_dim = 50
     word_output_dim = 50

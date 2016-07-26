@@ -8,9 +8,14 @@ from attention_layer import shape
 from keras import backend as K
 import numpy as np
 
-
 def fake_data(input_shape, dtype='float32', max_int=10):
-    val = np.random.random(input_shape)
+    random_shape = []
+    for shape in input_shape:
+        if shape is None:
+            random_shape.append(int(np.random.random() * 10))
+        else:
+            random_shape.append(shape)
+    val = np.random.random(random_shape)
     if dtype == 'int32':
         val = val * max_int
         val = val.astype(int)
