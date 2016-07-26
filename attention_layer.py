@@ -395,7 +395,7 @@ class HierarchicalAttention(Layer):
             output = reshape(output, target_shape=attention_input_shape)
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
             cur_output_shape = cur_output_shape[:-2] + [self.get_attention_output_dim(attention_input_shape, encoder_layer=encoder_layer, attention_layer=attention_layer)[-1]]
-            cur_output_tensor_shape = tuple(cur_output_tensor_shape[:2]) + (output.shape[1],)
+            cur_output_tensor_shape = tuple(cur_output_tensor_shape[:-2]) + (output.shape[1],)
             output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
