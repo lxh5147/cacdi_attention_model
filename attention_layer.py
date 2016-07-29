@@ -218,7 +218,6 @@ class SequenceToVectorEncoder(Layer):
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         self.conv = Convolution1D(self.output_dim, filter_length = self.window_size, border_mode = 'same')
-
         self.pooling = MaxPooling1D(pool_length = _MAX_SEQUENCE_LENGTH)
 
     def call(self, x, mask = None):
@@ -321,6 +320,7 @@ class HierarchicalAttention(Layer):
                 attention_vector = attention_layer(input_sequence)
                 return merge(inputs = [attention_vector, transformed_vector], mode = 'concat')
         else:
+            # in case of using pooling as the attention layer, the output shape is number_of_samples,1,output_dim
             return attention_layer(encoder_layer(input_sequence))
 
     def get_attention_output_dim(self, input_shape, encoder_layer, attention_layer):
@@ -331,6 +331,7 @@ class HierarchicalAttention(Layer):
         else:
             output_shape_1 = encoder_layer.get_output_shape_for(input_shape)
             output_shape_2 = attention_layer.get_output_shape_for(output_shape_1)
+            # warning: in case using pooling as the attention layer, the shape is number_of_samples, 1, output_dim
             return output_shape_2
 
     def get_output_dim(self, input_shapes):
@@ -396,7 +397,7 @@ class HierarchicalAttention(Layer):
             output = reshape(output, target_shape = attention_input_shape, target_tensor_shape = (-1, cur_output_tensor_shape[-2], cur_output_tensor_shape[-1]))
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
             cur_output_shape = cur_output_shape[:-2] + [self.get_attention_output_dim(attention_input_shape, encoder_layer = encoder_layer, attention_layer = attention_layer)[-1]]
-            cur_output_tensor_shape = tuple(cur_output_tensor_shape[:-2]) + (output.shape[1],)
+            cur_output_tensor_shape = tuple(cur_output_tensor_shape[:-2]) + (output.shape[-1],)
             output = reshape(output, target_shape = cur_output_shape, target_tensor_shape = cur_output_tensor_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
