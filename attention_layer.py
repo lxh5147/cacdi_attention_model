@@ -7,7 +7,7 @@ Created on Jul 5, 2016
 from keras import backend as K
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU, LSTM, time_distributed_dense
-from keras.layers.convolutional import Convolution1D, MaxPooling1D
+from keras.layers.convolutional import Convolution1D
 from keras.layers import Input, BatchNormalization, merge
 from keras.layers.embeddings import Embedding
 from keras.layers import Dense
@@ -18,8 +18,6 @@ import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
-
-_MAX_SEQUENCE_LENGTH = 100000
 
 def shape(x):
     if hasattr(x, '_keras_shape'):
@@ -75,6 +73,19 @@ def build_bi_directional_layer(left_to_right, right_to_left):
     check_and_throw_if_fail(K.ndim(right_to_left) == K.ndim(left_to_right) , "right_to_left")
     return BiDirectionalLayer()([left_to_right, right_to_left])
 
+class ManyToOnePooling(Layer):
+    def __init__(self, mode, axis = 1, ** kwargs):
+        self.mode = mode  # mode = K.max or K.mean
+        self.axis = axis
+        super(ReshapeLayer, self).__init__(**kwargs)
+    def call(self, x, mask = None):
+        return self.mode(x, axis = self.axis)
+    def get_output_shape_for(self, input_shape):
+        axis = self.axis % len (input_shape)
+        output_shape = list(input_shape)
+        del output_shape[axis]
+        return output_shape
+    
 def reshape(x, target_shape, target_tensor_shape = None):
     '''
     Helper function that performs reshape on a tensor
@@ -218,7 +229,7 @@ class SequenceToVectorEncoder(Layer):
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         self.conv = Convolution1D(self.output_dim, filter_length = self.window_size, border_mode = 'same')
-        self.pooling = MaxPooling1D(pool_length = _MAX_SEQUENCE_LENGTH)
+        self.pooling = ManyToOnePooling(mode = K.max)
 
     def call(self, x, mask = None):
         '''
@@ -300,10 +311,8 @@ class HierarchicalAttention(Layer):
             self.encoder_layers.append(encoder_layer)
 
     def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim, cur_sequence_length, cur_window_size):
-        if cur_sequence_length is None:
-            cur_sequence_length = _MAX_SEQUENCE_LENGTH
         if self.use_max_pooling_as_attention:
-            attention = MaxPooling1D(pool_length = cur_sequence_length)
+            attention = ManyToOnePooling(mode = K.max)
         else:
             attention = Attention(attention_weight_vector_dim)
         if self.use_sequence_to_vector_encoder:
@@ -320,7 +329,6 @@ class HierarchicalAttention(Layer):
                 attention_vector = attention_layer(input_sequence)
                 return merge(inputs = [attention_vector, transformed_vector], mode = 'concat')
         else:
-            # in case of using pooling as the attention layer, the output shape is number_of_samples,1,output_dim
             return attention_layer(encoder_layer(input_sequence))
 
     def get_attention_output_dim(self, input_shape, encoder_layer, attention_layer):
@@ -331,7 +339,6 @@ class HierarchicalAttention(Layer):
         else:
             output_shape_1 = encoder_layer.get_output_shape_for(input_shape)
             output_shape_2 = attention_layer.get_output_shape_for(output_shape_1)
-            # warning: in case using pooling as the attention layer, the shape is number_of_samples, 1, output_dim
             return output_shape_2
 
     def get_output_dim(self, input_shapes):
