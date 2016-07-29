@@ -27,9 +27,9 @@ def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sen
     # classifier
     use_sequence_to_vector_encoder = False
 
-    model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding,
-                                                         use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions,
-                                                         use_cnn_as_sequence_to_sequence_encoder, input_window_sizes , use_max_pooling_as_attention)
+    output_activation_function = 'softmax'
+
+    model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function, use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_max_pooling_as_attention)
     # compile the model
     model.compile(optimizer = SGD(momentum = 0.9)   , loss = categorical_crossentropy_ex, metrics = ['accuracy'])
     # train
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     hidden_unit_activation_functions = []
     use_cnn_as_sequence_to_sequence_encoder = True
     # sentence, word
-    input_window_sizes = [3, 2],
+    input_window_sizes = [3, 2]
     use_max_pooling_as_attention = True
     # batch size = 64
     imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions,
