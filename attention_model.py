@@ -19,8 +19,7 @@ def categorical_crossentropy_ex(y_true, y_pred):
 
 def build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function = 'softmax',
                                                  use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False):
-    inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims,
-                                                use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False)
+    inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
     classifier = ClassifierWithHierarchicalAttention (input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim,
                  initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function,
                  use_cnn_as_sequence_to_sequence_encoder , input_window_sizes , use_max_pooling_as_attention)
