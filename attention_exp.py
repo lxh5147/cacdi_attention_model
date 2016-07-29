@@ -12,7 +12,10 @@ def fake_data(input_shape, dtype='float32', max_int=10):
     random_shape = []
     for shape in input_shape:
         if shape is None:
-            random_shape.append(int(np.random.random() * 10))
+            n = int(np.random.random() * 10)
+            if n == 0 : 
+                n = 1
+            random_shape.append(n)
         else:
             random_shape.append(shape)
     val = np.random.random(random_shape)
