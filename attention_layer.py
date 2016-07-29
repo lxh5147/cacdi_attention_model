@@ -244,7 +244,8 @@ class HierarchicalAttention(Layer):
     Represents a hierarchical attention layer
     One example: snapshots* documents * sections* sentences * words
     '''
-    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding = None, use_sequence_to_vector_encoder = False, use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
+    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding = None, use_sequence_to_vector_encoder = False,
+                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
         '''
         top_feature_dim: dim of the top feature, e.g., the snapshot level feature
         attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
