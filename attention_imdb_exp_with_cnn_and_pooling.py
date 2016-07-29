@@ -9,10 +9,11 @@ import numpy as np
 from keras.callbacks import EarlyStopping
 from attention_exp import faked_dataset
 from keras.optimizers import SGD
+import keras.backend as K
 
 def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim,
              word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions,
-             use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False):
+             use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_pooling_mode = None):
 
     timesteps = 1
     # time_steps*  sentences * words
@@ -29,7 +30,7 @@ def imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sen
 
     output_activation_function = 'softmax'
 
-    model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function, use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_max_pooling_as_attention)
+    model = build_classifier_with_hierarchical_attention(input_shape, input_feature_dims, output_dims, attention_weight_vector_dims, vocabulary_size, word_embedding_dim, initial_embedding, use_sequence_to_vector_encoder, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function, use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_pooling_mode)
     # compile the model
     model.compile(optimizer = SGD(momentum = 0.9)   , loss = categorical_crossentropy_ex, metrics = ['accuracy'])
     # train
@@ -75,8 +76,8 @@ if __name__ == '__main__':
     use_cnn_as_sequence_to_sequence_encoder = True
     # sentence, word
     input_window_sizes = [3, 2]
-    use_max_pooling_as_attention = True
+    use_pooling_mode = K.max
     # batch size = 64
     imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions,
-             use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_max_pooling_as_attention)
+             use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_pooling_mode)
 

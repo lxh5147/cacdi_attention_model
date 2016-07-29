@@ -255,7 +255,7 @@ class HierarchicalAttention(Layer):
     One example: snapshots* documents * sections* sentences * words
     '''
     def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding = None, use_sequence_to_vector_encoder = False,
-                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
+                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_pooling_mode = None, **kwargs):
         '''
         top_feature_dim: dim of the top feature, e.g., the snapshot level feature
         attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
@@ -263,7 +263,7 @@ class HierarchicalAttention(Layer):
         use_sequence_to_vector_encoder: True if use sequence to vector encoder otherwise sequence to sequence encoder inside all attention layers
         '''
         check_and_throw_if_fail(len(attention_output_dims) > 0 , "attention_output_dims")
-        check_and_throw_if_fail(use_max_pooling_as_attention == True or len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
+        check_and_throw_if_fail(use_pooling_mode or len(attention_weight_vector_dims) == len(attention_output_dims), "attention_weight_vector_dims")
         check_and_throw_if_fail(top_level_input_feature_dim >= 0 , "top_level_input_feature_dim")
         check_and_throw_if_fail(use_cnn_as_sequence_to_sequence_encoder == False or  input_window_sizes is not None  , "input_window_sizes")
         check_and_throw_if_fail(input_window_sizes is None or  len(input_window_sizes) == len(attention_output_dims) , "input_window_sizes")
@@ -276,7 +276,7 @@ class HierarchicalAttention(Layer):
         self.use_cnn_as_sequence_to_sequence_encoder = use_cnn_as_sequence_to_sequence_encoder
         self.input_window_sizes = input_window_sizes
         self.top_level_input_feature_dim = top_level_input_feature_dim
-        self.use_max_pooling_as_attention = use_max_pooling_as_attention
+        self.use_pooling_mode = use_pooling_mode
         super(HierarchicalAttention, self).__init__(**kwargs)
 
     def build(self, input_shapes):
@@ -298,7 +298,7 @@ class HierarchicalAttention(Layer):
         for cur_dim in xrange(total_dim - 1 , 1, -1):
             cur_output_dim = self.attention_output_dims[cur_dim - 2]
             cur_sequence_length = input_shape[cur_dim]
-            if self.use_max_pooling_as_attention:
+            if self.use_pooling_mode:
                 attention_weight_vector_dim = None
             else:
                 attention_weight_vector_dim = self.attention_weight_vector_dims[cur_dim - 2]
@@ -311,8 +311,8 @@ class HierarchicalAttention(Layer):
             self.encoder_layers.append(encoder_layer)
 
     def create_attention_layer(self, attention_weight_vector_dim, cur_output_dim, cur_sequence_length, cur_window_size):
-        if self.use_max_pooling_as_attention:
-            attention = ManyToOnePooling(mode = K.max)
+        if self.use_pooling_mode:
+            attention = ManyToOnePooling(mode = self.use_pooling_mode)
         else:
             attention = Attention(attention_weight_vector_dim)
         if self.use_sequence_to_vector_encoder:
@@ -475,7 +475,7 @@ class MLPClassifierLayer(Layer):
 class ClassifierWithHierarchicalAttention(Layer):
     def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim,
                  initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function = 'softmax',
-                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
+                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_pooling_mode = None, **kwargs):
         self.top_level_input_feature_dim = top_level_input_feature_dim
         self.attention_output_dims = attention_output_dims
         self.attention_weight_vector_dims = attention_weight_vector_dims
@@ -491,13 +491,13 @@ class ClassifierWithHierarchicalAttention(Layer):
             self.uses_learning_phase = True
         self.use_cnn_as_sequence_to_sequence_encoder = use_cnn_as_sequence_to_sequence_encoder
         self.input_window_sizes = input_window_sizes
-        self.use_max_pooling_as_attention = use_max_pooling_as_attention
+        self.use_pooling_mode = use_pooling_mode
         super(ClassifierWithHierarchicalAttention, self).__init__(**kwargs)
 
     def build(self, input_shapes):
         self.hierarchical_attention = HierarchicalAttention(self.top_level_input_feature_dim, self.attention_output_dims, self.attention_weight_vector_dims,
                                                               self.embedding_rows, self.embedding_dim, self.initial_embedding, self.use_sequence_to_vector_encoder,
-                                                              self.use_cnn_as_sequence_to_sequence_encoder , self.input_window_sizes , self.use_max_pooling_as_attention)
+                                                              self.use_cnn_as_sequence_to_sequence_encoder , self.input_window_sizes , self.use_pooling_mode)
         self.mlp_softmax_classifier = MLPClassifierLayer(self.output_dim, self.hidden_unit_numbers, self.hidden_unit_activation_functions, self. output_activation_function)
 
     def call(self, inputs, mask = None):
