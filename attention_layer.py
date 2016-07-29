@@ -32,7 +32,7 @@ if K._BACKEND == 'theano':
     def reverse(x):
         return x[::-1]
 
-    def _reshape(x, shape, ndim=None):
+    def _reshape(x, shape, ndim = None):
         return T.reshape(x, shape, ndim)
 
 elif K._BACKEND == 'tensorflow':
@@ -42,7 +42,7 @@ elif K._BACKEND == 'tensorflow':
         x_list.reverse()
         return K.pack(x_list)
 
-    def _reshape(x, shape, ndim=None):
+    def _reshape(x, shape, ndim = None):
         return tf.reshape(x, shape)
 
 def check_and_throw_if_fail(condition, msg):
@@ -59,7 +59,7 @@ def build_bi_directional_layer(left_to_right, right_to_left):
     Helper function that performs reshape on a tensor
     '''
     class BiDirectionalLayer(Layer):
-        def call(self, inputs, mask=None):
+        def call(self, inputs, mask = None):
             left_to_right = inputs[0]
             right_to_left = inputs[1]
             ndim = K.ndim(right_to_left)
@@ -67,7 +67,7 @@ def build_bi_directional_layer(left_to_right, right_to_left):
             right_to_left = K.permute_dimensions(right_to_left, axes)
             right_to_left = reverse(right_to_left)
             right_to_left = K.permute_dimensions(right_to_left, axes)
-            return K.concatenate([left_to_right, right_to_left], axis=-1)
+            return K.concatenate([left_to_right, right_to_left], axis = -1)
         def get_output_shape_for(self, input_shapes):
             return input_shapes[0][:-1] + (input_shapes[0][-1] + input_shapes[1][-1],)
 
@@ -75,7 +75,7 @@ def build_bi_directional_layer(left_to_right, right_to_left):
     check_and_throw_if_fail(K.ndim(right_to_left) == K.ndim(left_to_right) , "right_to_left")
     return BiDirectionalLayer()([left_to_right, right_to_left])
 
-def reshape(x, target_shape, target_tensor_shape=None):
+def reshape(x, target_shape, target_tensor_shape = None):
     '''
     Helper function that performs reshape on a tensor
     '''
@@ -83,27 +83,27 @@ def reshape(x, target_shape, target_tensor_shape=None):
         '''
         Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
         '''
-        def __init__(self, target_shape, target_tensor_shape=None, ** kwargs):
+        def __init__(self, target_shape, target_tensor_shape = None, ** kwargs):
             self.target_shape = tuple(target_shape)
             self.target_tensor_shape = target_tensor_shape
             super(ReshapeLayer, self).__init__(**kwargs)
 
-        def call(self, x, mask=None):
+        def call(self, x, mask = None):
             if self.target_tensor_shape:
-                return _reshape(x, self.target_tensor_shape, ndim=len(self.target_shape))    # required by theano
+                return _reshape(x, self.target_tensor_shape, ndim = len(self.target_shape))  # required by theano
             else:
                 return _reshape(x, self.target_shape)
 
         def get_output_shape_for(self, input_shape):
             return self.target_shape
 
-    return ReshapeLayer(target_shape=target_shape, target_tensor_shape=target_tensor_shape)(x)
+    return ReshapeLayer(target_shape = target_shape, target_tensor_shape = target_tensor_shape)(x)
 
 class Attention(Layer):
     '''
     Refer to: https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf, formula 8,9 and 10
     '''
-    def __init__(self, attention_weight_vector_dim, element_wise_output_transformer=None, **kwargs):
+    def __init__(self, attention_weight_vector_dim, element_wise_output_transformer = None, **kwargs):
         '''
         attention_weight_vector_dim: dimension of the attention weight vector 
         element_wise_output_transformer: element-wise output transformer,e.g., K.sigmoid
@@ -128,15 +128,15 @@ class Attention(Layer):
         self.us = K.variable(initial_us)
         self.trainable_weights = [self.Ws, self.bs, self.us]
 
-    def call(self, x, mask=None):
+    def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
-        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs))    # batch_size, time_steps, attention_weight_vector_dim
-        ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us, 1), output_dim=1))    # batch_size, time_steps, 1
-        sum_of_ai = K.sum(ai, 1, keepdims=True)    # batch_size 1 1
-        ai = ai / sum_of_ai    # batch_size * time_steps * 1
+        ui = K.tanh(time_distributed_dense(x, self.Ws, self.bs))  # batch_size, time_steps, attention_weight_vector_dim
+        ai = K.exp(time_distributed_dense(ui, K.expand_dims(self.us, 1), output_dim = 1))  # batch_size, time_steps, 1
+        sum_of_ai = K.sum(ai, 1, keepdims = True)  # batch_size 1 1
+        ai = ai / sum_of_ai  # batch_size * time_steps * 1
         # batch_size *time_steps * input_dim -> batch_size* input_dim
         output = K.sum(ai * x, 1)
         if self.element_wise_output_transformer:
@@ -155,7 +155,7 @@ class SequenceToSequenceEncoder(Layer):
     '''
     Represents an encoder that transforms input sequence to another sequence
     '''
-    def __init__(self, output_dim, is_bi_directional=True, use_gru=True, **kwargs):
+    def __init__(self, output_dim, is_bi_directional = True, use_gru = True, **kwargs):
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
         self.output_dim = output_dim
         self.is_bi_directional = is_bi_directional
@@ -168,17 +168,17 @@ class SequenceToSequenceEncoder(Layer):
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
         if self.use_gru:
-            self.encoder_left_to_right = GRU(self.output_dim, return_sequences=True)
+            self.encoder_left_to_right = GRU(self.output_dim, return_sequences = True)
         else:
-            self.encoder_left_to_right = LSTM (self.output_dim, return_sequences=True)
+            self.encoder_left_to_right = LSTM (self.output_dim, return_sequences = True)
 
         if self.is_bi_directional:
             if self.use_gru:
-                self.encoder_right_to_left = GRU(self.output_dim, return_sequences=True, go_backwards=True)
+                self.encoder_right_to_left = GRU(self.output_dim, return_sequences = True, go_backwards = True)
             else:
-                self.encoder_right_to_left = LSTM(self.output_dim, return_sequences=True, go_backwards=True)
+                self.encoder_right_to_left = LSTM(self.output_dim, return_sequences = True, go_backwards = True)
 
-    def call(self, x, mask=None):
+    def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
         returns a tensor of shape batch_size * time_steps * 2*input_dim (or input_dim if not bidirectional)  
@@ -205,7 +205,7 @@ class SequenceToVectorEncoder(Layer):
     '''
     Represents an encoder that transforms a sequence into a vector 
     '''
-    def __init__(self, output_dim, window_size=3 , **kwargs):
+    def __init__(self, output_dim, window_size = 3 , **kwargs):
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
         check_and_throw_if_fail(window_size > 0 , "window_size")
         self.output_dim = output_dim
@@ -217,18 +217,18 @@ class SequenceToVectorEncoder(Layer):
         input_shape: batch_size * time_steps* input_dim
         '''
         check_and_throw_if_fail(len(input_shape) == 3, "input_shape")
-        self.conv = Convolution1D(self.output_dim, filter_length=self.window_size, border_mode='same')
+        self.conv = Convolution1D(self.output_dim, filter_length = self.window_size, border_mode = 'same')
 
-        self.pooling = MaxPooling1D(pool_length=_MAX_SEQUENCE_LENGTH)
+        self.pooling = MaxPooling1D(pool_length = _MAX_SEQUENCE_LENGTH)
 
-    def call(self, x, mask=None):
+    def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
         Returns a tensor of the shape: batch_size * output_dim
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
         output = self.conv(x)
-        output = self.pooling(output)    # batch_size * 1 * output_dim
+        output = self.pooling(output)  # batch_size * 1 * output_dim
         # to remove the time step dimension
         return K.squeeze(output, 1)
 
@@ -244,7 +244,7 @@ class HierarchicalAttention(Layer):
     Represents a hierarchical attention layer
     One example: snapshots* documents * sections* sentences * words
     '''
-    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding=None, use_sequence_to_vector_encoder=False, use_cnn_as_sequence_to_sequence_encoder=False, input_window_sizes=None, use_max_pooling_as_attention=False, **kwargs):
+    def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding = None, use_sequence_to_vector_encoder = False, use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
         '''
         top_feature_dim: dim of the top feature, e.g., the snapshot level feature
         attention_output_dims: attention output dimensions on different levels: e.g., section, document, sentence, word
@@ -278,8 +278,8 @@ class HierarchicalAttention(Layer):
         if not  type(input_shapes) is  list:
             input_shapes = [input_shapes]
         input_shape = input_shapes[0]
-        self.input_spec = [InputSpec(shape=input_shape)]
-        self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights=[self.initial_embedding])
+        self.input_spec = [InputSpec(shape = input_shape)]
+        self.embedding = Embedding(self.embedding_rows, self.embedding_dim, weights = [self.initial_embedding])
         self.attention_layers = []
         self.encoder_layers = []
         total_dim = len(input_shape)
@@ -303,14 +303,14 @@ class HierarchicalAttention(Layer):
         if cur_sequence_length is None:
             cur_sequence_length = _MAX_SEQUENCE_LENGTH
         if self.use_max_pooling_as_attention:
-            attention = MaxPooling1D(pool_length=cur_sequence_length)
+            attention = MaxPooling1D(pool_length = cur_sequence_length)
         else:
             attention = Attention(attention_weight_vector_dim)
         if self.use_sequence_to_vector_encoder:
             return attention, SequenceToVectorEncoder(cur_output_dim)
         else:
             if self.use_cnn_as_sequence_to_sequence_encoder:
-                return attention, Convolution1D(cur_output_dim, filter_length=cur_window_size, border_mode='same')
+                return attention, Convolution1D(cur_output_dim, filter_length = cur_window_size, border_mode = 'same')
             else:
                 return attention, SequenceToSequenceEncoder(cur_output_dim)
 
@@ -318,7 +318,7 @@ class HierarchicalAttention(Layer):
         if self.use_sequence_to_vector_encoder:
                 transformed_vector = encoder_layer(input_sequence)
                 attention_vector = attention_layer(input_sequence)
-                return merge(inputs=[attention_vector, transformed_vector], mode='concat')
+                return merge(inputs = [attention_vector, transformed_vector], mode = 'concat')
         else:
             return attention_layer(encoder_layer(input_sequence))
 
@@ -359,17 +359,17 @@ class HierarchicalAttention(Layer):
         check_and_throw_if_fail(len(input_feature_dims) == len(input_shape) , "input_feature_dims")
         total_level = len(input_shape)
         # The shape parameter of an Input does not include the first batch_size dimension
-        inputs.append(Input(shape=input_shape, dtype="int32"))
+        inputs.append(Input(shape = input_shape, dtype = "int32"))
         # for each level, create an input
         for cur_level in xrange(total_level - 1 , -1, -1):
             if input_feature_dims[cur_level] > 0:
-                tensor_input = Input(shape=input_shape[:cur_level + 1] + (input_feature_dims[cur_level],))
+                tensor_input = Input(shape = input_shape[:cur_level + 1] + (input_feature_dims[cur_level],))
                 tensor_input._level = cur_level
                 tensor_input._input_dim = input_feature_dims[cur_level]
                 inputs.append(tensor_input)
         return inputs
 
-    def call(self, inputs, mask=None):
+    def call(self, inputs, mask = None):
         '''
         inputs: a list of inputs; the first layer is lowest level sequence, second layer lowest level input features, ..., the top level input features
         returns a tensor of shape: batch_size*snapshots*output_dim
@@ -379,7 +379,7 @@ class HierarchicalAttention(Layer):
         check_and_throw_if_fail(len(inputs) <= 2 + len(self.attention_layers) , "inputs")
         output = self.embedding(inputs[0])
         cur_output_shape = list(self.input_spec[0].shape + (self.embedding_dim,))
-        output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=tuple(inputs[0].shape) + (self.embedding_dim,))
+        output = reshape(output, target_shape = cur_output_shape, target_tensor_shape = tuple(inputs[0].shape) + (self.embedding_dim,))
         level_to_input = {}
         if len(inputs) > 1:
             for tensor_input in inputs[1:]:
@@ -388,19 +388,19 @@ class HierarchicalAttention(Layer):
         cur_level = len (self.attention_layers)
         for attention_layer, encoder_layer  in zip(self.attention_layers, self.encoder_layers):
             if cur_level in level_to_input:
-                output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
+                output = merge(inputs = [output, level_to_input[cur_level]], mode = 'concat')
                 cur_output_shape[-1] += level_to_input[cur_level]._input_dim
             cur_output_tensor_shape = output.shape
             attention_input_shape = (-1, cur_output_shape[-2], cur_output_shape[-1])
-            output = reshape(output, target_shape=attention_input_shape,target_tensor_shape=(-1,cur_output_tensor_shape[-2],cur_output_tensor_shape[-1]))
+            output = reshape(output, target_shape = attention_input_shape, target_tensor_shape = (-1, cur_output_tensor_shape[-2], cur_output_tensor_shape[-1]))
             output = self.call_attention_layer(output, attention_layer, encoder_layer)
-            cur_output_shape = cur_output_shape[:-2] + [self.get_attention_output_dim(attention_input_shape, encoder_layer=encoder_layer, attention_layer=attention_layer)[-1]]
+            cur_output_shape = cur_output_shape[:-2] + [self.get_attention_output_dim(attention_input_shape, encoder_layer = encoder_layer, attention_layer = attention_layer)[-1]]
             cur_output_tensor_shape = tuple(cur_output_tensor_shape[:-2]) + (output.shape[1],)
-            output = reshape(output, target_shape=cur_output_shape, target_tensor_shape=cur_output_tensor_shape)
+            output = reshape(output, target_shape = cur_output_shape, target_tensor_shape = cur_output_tensor_shape)
             cur_level -= 1
         # output: batch_size*time_steps*cacdi_snapshot_attention
         if cur_level in level_to_input:
-            output = merge(inputs=[output, level_to_input[cur_level]], mode='concat')
+            output = merge(inputs = [output, level_to_input[cur_level]], mode = 'concat')
         return output
 
     def get_output_shape_for(self, input_shapes):
@@ -420,7 +420,7 @@ class MLPClassifierLayer(Layer):
     '''
     Represents a mlp classifier, which consists of several hidden layers followed by a softmax output layer
     '''
-    def __init__(self, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function='softmax', **kwargs):
+    def __init__(self, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function = 'softmax', **kwargs):
         '''
         input_sequence: input sequence, batch_size * time_steps * input_dim
         hidden_unit_numbers: number of hidden units of each hidden layer
@@ -442,19 +442,19 @@ class MLPClassifierLayer(Layer):
         self.layers = []
         ndim = len(input_shape)
         for hidden_unit_number, hidden_unit_activation_function in zip(self.hidden_unit_numbers, self.hidden_unit_activation_functions):
-            dense = Dense(hidden_unit_number, activation=hidden_unit_activation_function)
+            dense = Dense(hidden_unit_number, activation = hidden_unit_activation_function)
             if ndim == 3:
                 dense = TimeDistributed(dense)
             norm = BatchNormalization()
             self.layers.append(dense)
             self.layers.append(norm)
 
-        dense = Dense(self.output_dim, activation=self.output_activation_function)
+        dense = Dense(self.output_dim, activation = self.output_activation_function)
         if ndim == 3:
             dense = TimeDistributed(dense)
         self.layers.append(dense)
 
-    def call(self, x, mask=None):
+    def call(self, x, mask = None):
         output = x
         for layer in self.layers:
             output = layer(output)
@@ -465,7 +465,8 @@ class MLPClassifierLayer(Layer):
 
 class ClassifierWithHierarchicalAttention(Layer):
     def __init__(self, top_level_input_feature_dim, attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim,
-                 initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function='softmax', **kwargs):
+                 initial_embedding, use_sequence_to_vector_encoder, output_dim, hidden_unit_numbers, hidden_unit_activation_functions, output_activation_function = 'softmax',
+                 use_cnn_as_sequence_to_sequence_encoder = False, input_window_sizes = None, use_max_pooling_as_attention = False, **kwargs):
         self.top_level_input_feature_dim = top_level_input_feature_dim
         self.attention_output_dims = attention_output_dims
         self.attention_weight_vector_dims = attention_weight_vector_dims
@@ -479,14 +480,18 @@ class ClassifierWithHierarchicalAttention(Layer):
         self. output_activation_function = output_activation_function
         if hidden_unit_numbers:
             self.uses_learning_phase = True
+        self.use_cnn_as_sequence_to_sequence_encoder = use_cnn_as_sequence_to_sequence_encoder
+        self.input_window_sizes = input_window_sizes
+        self.use_max_pooling_as_attention = use_max_pooling_as_attention
         super(ClassifierWithHierarchicalAttention, self).__init__(**kwargs)
 
     def build(self, input_shapes):
         self.hierarchical_attention = HierarchicalAttention(self.top_level_input_feature_dim, self.attention_output_dims, self.attention_weight_vector_dims,
-                                                              self.embedding_rows, self.embedding_dim, self.initial_embedding, self.use_sequence_to_vector_encoder)
+                                                              self.embedding_rows, self.embedding_dim, self.initial_embedding, self.use_sequence_to_vector_encoder,
+                                                              self.use_cnn_as_sequence_to_sequence_encoder , self.input_window_sizes , self.use_max_pooling_as_attention)
         self.mlp_softmax_classifier = MLPClassifierLayer(self.output_dim, self.hidden_unit_numbers, self.hidden_unit_activation_functions, self. output_activation_function)
 
-    def call(self, inputs, mask=None):
+    def call(self, inputs, mask = None):
         output = self.hierarchical_attention(inputs)
         output = self.mlp_softmax_classifier(output)
         return output
