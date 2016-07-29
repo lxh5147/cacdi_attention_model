@@ -77,14 +77,14 @@ class ManyToOnePooling(Layer):
     def __init__(self, mode, axis = 1, ** kwargs):
         self.mode = mode  # mode = K.max or K.mean
         self.axis = axis
-        super(ReshapeLayer, self).__init__(**kwargs)
+        super(ManyToOnePooling, self).__init__(**kwargs)
     def call(self, x, mask = None):
         return self.mode(x, axis = self.axis)
     def get_output_shape_for(self, input_shape):
         axis = self.axis % len (input_shape)
         output_shape = list(input_shape)
         del output_shape[axis]
-        return output_shape
+        return tuple(output_shape)
     
 def reshape(x, target_shape, target_tensor_shape = None):
     '''
