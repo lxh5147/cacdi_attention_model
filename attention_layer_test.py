@@ -10,21 +10,21 @@ from keras import backend as K
 import numpy as np
 from attention_exp import  faked_dataset
 
-def run(outputs,feed_dict):
-    func=K.function(feed_dict.keys(),outputs)
+def run(outputs, feed_dict):
+    func = K.function(feed_dict.keys(), outputs)
     return func(feed_dict.values())
 
 class AttentionLayerTest(unittest.TestCase):
 
     def test_attention(self):
-        attention = Attention(attention_weight_vector_dim=5)
-        x = Input(shape=(5, 10))
+        attention = Attention(attention_weight_vector_dim = 5)
+        x = Input(shape = (5, 10))
         y = attention(x)
         self.assertEqual(shape(y), (None, 10), "y")
         self.assertEqual(hasattr(y, '_keras_history'), True, "y")
 
     def test_transform_sequence_to_sequence(self):
-        tensor_input = Input(shape=(5, 10))
+        tensor_input = Input(shape = (5, 10))
         output_dim = 20
         sequence_to_sequence_encoder = SequenceToSequenceEncoder(output_dim)
         output_sequence = sequence_to_sequence_encoder(tensor_input)
@@ -35,7 +35,7 @@ class AttentionLayerTest(unittest.TestCase):
     def test_transform_sequence_to_vector_encoder(self):
         output_dim = 20
         sequence_to_vector_encoder = SequenceToVectorEncoder(output_dim)
-        tensor_input = Input(shape=(5, 10))
+        tensor_input = Input(shape = (5, 10))
         output_vector = sequence_to_vector_encoder(tensor_input)
         self.assertEqual(shape(output_vector), (None, 20), "output_vector")
         self.assertEqual(output_vector._keras_shape, (None, 20), "output_vector")
@@ -50,12 +50,12 @@ class AttentionLayerTest(unittest.TestCase):
         inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
 
         self.assertEqual(len(inputs) , len(input_feature_dims) + 1, "inputs")
-        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")    # original input
-        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")    # word features
-        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")    # sentence features
-        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")    # section features
-        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")    # document features
-        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")    # snapshot features
+        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")  # original input
+        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")  # word features
+        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")  # sentence features
+        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")  # section features
+        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")  # document features
+        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")  # snapshot features
 
     def test_hierarchical_attention_layer_inputs(self):
         # snapshots* documents * sections* sentences * words
@@ -71,15 +71,15 @@ class AttentionLayerTest(unittest.TestCase):
         embedding_dim = 50
         initial_embedding = np.random.random((embedding_rows, embedding_dim))
         inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
-        hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder=False)
+        hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)
         output = hierarchical_attention(inputs)
         self.assertEqual(shape(output), (None, 7, 20 + 45 * 2), "output")
 
 
     def test_mlp_softmax_classifier(self):
-        x = Input(shape=(5, 10))
+        x = Input(shape = (5, 10))
         output_dim = 100
-        hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
+        hidden_unit_numbers = (5, 20)  # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ("relu", "relu")
         mlp_softmax_classifier = MLPClassifierLayer(output_dim, hidden_unit_numbers, hidden_unit_activation_functions)
         y = mlp_softmax_classifier(x)
@@ -99,7 +99,7 @@ class AttentionLayerTest(unittest.TestCase):
         word_embedding_dim = 50
         # classifier
         output_dim = 100
-        hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
+        hidden_unit_numbers = (5, 20)  # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ("relu", "relu")
         use_sequence_to_vector_encoder = False
 
@@ -110,12 +110,12 @@ class AttentionLayerTest(unittest.TestCase):
         inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
 
         self.assertEqual(len(inputs) , len(input_feature_dims) + 1, "inputs")
-        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")    # original input
-        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")    # word features
-        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")    # sentence features
-        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")    # section features
-        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")    # document features
-        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")    # snapshot features
+        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")  # original input
+        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")  # word features
+        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")  # sentence features
+        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")  # section features
+        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")  # document features
+        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")  # snapshot features
         # check output
         output = classifier(inputs)
         self.assertEqual(shape(output), (None, 7, 100), "y")
@@ -134,7 +134,7 @@ class AttentionLayerTest(unittest.TestCase):
         # classifier
         initial_embedding = np.random.random((embedding_rows, embedding_dim))
         inputs = HierarchicalAttention.build_inputs(input_shape, input_feature_dims)
-        hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder=False)
+        hierarchical_attention = HierarchicalAttention(input_feature_dims[0], attention_output_dims, attention_weight_vector_dims, embedding_rows, embedding_dim, initial_embedding, use_sequence_to_vector_encoder = False)
         output = hierarchical_attention(inputs)
 
         total = 2
@@ -149,13 +149,13 @@ class AttentionLayerTest(unittest.TestCase):
         feed_dict[K.learning_phase()] = 1
         # tf.initialize_all_variables()
         # y_out is fine 2,7, 110
-        y_out = run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict = feed_dict)
         self.assertEquals(y_out.shape , (2, 7, 110), "y_out")
 
     def test_softmax_layer_by_run(self):
-        input_sequence = Input(shape=(7, 110))
+        input_sequence = Input(shape = (7, 110))
         output_dim = 5
-        hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
+        hidden_unit_numbers = (5, 20)  # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ("relu", "relu")
         mlp_softmax_classifier = MLPClassifierLayer(output_dim, hidden_unit_numbers, hidden_unit_activation_functions)
 
@@ -167,7 +167,7 @@ class AttentionLayerTest(unittest.TestCase):
         feed_dict[K.learning_phase()] = 1
         # tf.initialize_all_variables()
         # y_out is fine 2,7, 110
-        y_out = run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict = feed_dict)
         self.assertEqual(y_out.shape , (total, shape(input_sequence)[1], output_dim) , "y_out")
 
     def test_attention_with_classifier_layer_by_run(self):
@@ -184,7 +184,7 @@ class AttentionLayerTest(unittest.TestCase):
         output_dim = 5
         # hidden_unit_numbers=(5, 20) # 5--> first hidden layer, 20 --> second hidden layer
         # drop_out_rates = ( 0.5, 0.6)
-        hidden_unit_numbers = ()    # 5--> first hidden layer, 20 --> second hidden layer
+        hidden_unit_numbers = ()  # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ()
 
         # classifier
@@ -205,7 +205,7 @@ class AttentionLayerTest(unittest.TestCase):
             feed_dict[inputs[i]] = x_train[i]
         feed_dict[K.learning_phase()] = 1
 
-        y_out = run(output, feed_dict=feed_dict)
+        y_out = run(output, feed_dict = feed_dict)
         self.assertEqual(y_out.shape , (total , timesteps, output_dim), "y_out")
 
 if __name__ == "__main__":

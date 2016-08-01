@@ -85,7 +85,7 @@ class ManyToOnePooling(Layer):
         output_shape = list(input_shape)
         del output_shape[axis]
         return tuple(output_shape)
-    
+
 def reshape(x, target_shape, target_tensor_shape = None):
     '''
     Helper function that performs reshape on a tensor
@@ -116,7 +116,7 @@ class Attention(Layer):
     '''
     def __init__(self, attention_weight_vector_dim, element_wise_output_transformer = None, **kwargs):
         '''
-        attention_weight_vector_dim: dimension of the attention weight vector 
+        attention_weight_vector_dim: dimension of the attention weight vector
         element_wise_output_transformer: element-wise output transformer,e.g., K.sigmoid
         '''
         check_and_throw_if_fail(attention_weight_vector_dim > 0 , "attention_weight_vector_dim")
@@ -192,7 +192,7 @@ class SequenceToSequenceEncoder(Layer):
     def call(self, x, mask = None):
         '''
         x: batch_size * time_steps* input_dim
-        returns a tensor of shape batch_size * time_steps * 2*input_dim (or input_dim if not bidirectional)  
+        returns a tensor of shape batch_size * time_steps * 2*input_dim (or input_dim if not bidirectional)
         '''
         check_and_throw_if_fail(K.ndim(x) == 3, "x")
         h1 = self. encoder_left_to_right(x)
@@ -214,7 +214,7 @@ class SequenceToSequenceEncoder(Layer):
 
 class SequenceToVectorEncoder(Layer):
     '''
-    Represents an encoder that transforms a sequence into a vector 
+    Represents an encoder that transforms a sequence into a vector
     '''
     def __init__(self, output_dim, window_size = 3 , **kwargs):
         check_and_throw_if_fail(output_dim > 0 , "output_dim")
@@ -360,7 +360,7 @@ class HierarchicalAttention(Layer):
     def build_inputs(input_shape, input_feature_dims):
         '''
         input_shape: input shape, e.g., snapshots* documents * sections* sentences * words
-        input_feature_dims: input feature dims, first one being the dim of top level feature, and last being the dim of the most low level feature 
+        input_feature_dims: input feature dims, first one being the dim of top level feature, and last being the dim of the most low level feature
         return inputs, first one being the most fine-grained/low level input, and last being the most coarse/high level input
         '''
         inputs = []
@@ -454,7 +454,7 @@ class MLPClassifierLayer(Layer):
             dense = Dense(hidden_unit_number, activation = hidden_unit_activation_function)
             if ndim == 3:
                 dense = TimeDistributed(dense)
-            norm = BatchNormalization()
+            norm = BatchNormalization(mode = 2)
             self.layers.append(dense)
             self.layers.append(norm)
 
@@ -507,4 +507,3 @@ class ClassifierWithHierarchicalAttention(Layer):
 
     def get_output_shape_for(self, input_shapes):
         return self.hierarchical_attention.get_output_shape_for(input_shapes)[:-1] + (self.output_dim,)
-

@@ -80,4 +80,3 @@ if __name__ == '__main__':
     # batch size = 64
     imdb_exp(max_sentences, max_words, sentence_output_dim, word_output_dim, sentence_attention_weight_vec_dim, word_attention_weight_vec_dim, vocabulary_size, word_embedding_dim, initial_embedding, classifier_output_dim, classifier_hidden_unit_numbers, hidden_unit_activation_functions,
              use_cnn_as_sequence_to_sequence_encoder, input_window_sizes, use_pooling_mode)
-

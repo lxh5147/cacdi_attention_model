@@ -25,7 +25,7 @@ class AttentionModelTest(unittest.TestCase):
         word_embedding_dim = 50
         # classifier
         output_dim = 100
-        hidden_unit_numbers = (5, 20)    # 5--> first hidden layer, 20 --> second hidden layer
+        hidden_unit_numbers = (5, 20)  # 5--> first hidden layer, 20 --> second hidden layer
         hidden_unit_activation_functions = ("relu", "relu")
         use_sequence_to_vector_encoder = False
 
@@ -34,12 +34,12 @@ class AttentionModelTest(unittest.TestCase):
         # check inputs of model
         inputs = model.inputs
         self.assertEqual(len(inputs) , len(input_feature_dims) + 1, "inputs")
-        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")    # original input
-        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")    # word features
-        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")    # sentence features
-        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")    # section features
-        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")    # document features
-        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")    # snapshot features
+        self.assertEqual(shape(inputs[0]), (None, 7, 8, 5, 6, 9), "inputs")  # original input
+        self.assertEqual(shape(inputs[1]), (None, 7, 8, 5, 6, 9, 30), "inputs")  # word features
+        self.assertEqual(shape(inputs[2]), (None, 7, 8, 5, 6, 60), "inputs")  # sentence features
+        self.assertEqual(shape(inputs[3]), (None, 7, 8, 5, 50), "inputs")  # section features
+        self.assertEqual(shape(inputs[4]), (None, 7, 8, 10), "inputs")  # document features
+        self.assertEqual(shape(inputs[5]), (None, 7, 20), "inputs")  # snapshot features
         # check output of model
         self.assertEqual(len(model.outputs), 1, "model")
         self.assertEqual(shape(model.outputs[0]), (None, 7, 100), "y")
