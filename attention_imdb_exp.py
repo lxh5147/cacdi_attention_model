@@ -56,7 +56,8 @@ def imdb_exp(max_sentences,
         use_sequence_to_vector_encoder,
         classifier_output_dim,
         classifier_hidden_unit_numbers,
-        hidden_unit_activation_functions)
+        hidden_unit_activation_functions,
+        output_activation_function = "softmax")
 
     # compile the model
     model.compile(
