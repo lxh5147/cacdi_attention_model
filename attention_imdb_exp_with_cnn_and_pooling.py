@@ -3,7 +3,8 @@ Created on Jul 13, 2016
 
 @author: lxh5147
 '''
-from attention_model import  build_classifier_with_hierarchical_attention, categorical_crossentropy_ex
+from objectives import categorical_crossentropy_ex
+from attention_model import  build_classifier_with_hierarchical_attention
 from attention_layer import check_and_throw_if_fail
 import numpy as np
 from keras.callbacks import EarlyStopping

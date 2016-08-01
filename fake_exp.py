@@ -3,7 +3,8 @@ Created on Jul 13, 2016
 
 @author: lxh5147
 '''
-from attention_model import  build_classifier_with_hierarchical_attention, binary_crossentropy_ex
+from objectives import binary_crossentropy_ex
+from attention_model import  build_classifier_with_hierarchical_attention
 from attention_layer import check_and_throw_if_fail
 from attention_exp import  faked_dataset
 import numpy as np

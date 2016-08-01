@@ -14,9 +14,8 @@ from fuel_cacdi.datasets.imdb import IMDBDatasetWrapper
 
 from attention_exp import faked_dataset
 from attention_layer import check_and_throw_if_fail
-from attention_model import (
-    build_classifier_with_hierarchical_attention,
-    categorical_crossentropy_ex)
+from attention_model import build_classifier_with_hierarchical_attention
+from objectives import categorical_crossentropy_ex
 
 # x_train, y_train, x_test, y_test, x_pred, batch_size, nb_epoch,
 def imdb_exp(max_sentences,
