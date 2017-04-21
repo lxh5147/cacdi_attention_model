@@ -1,0 +1,11 @@
+pkgconfig
+cython
+numpy
+six
+unittest2
+fuel>=0.2.0
+h5py>=2.6.0
+keras>=1.1.2.1
+theano>=0.8.2a0
+n3lu_cacdi>=0.2.4
+fuel-cacdi

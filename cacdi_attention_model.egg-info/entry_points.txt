@@ -1,0 +1,4 @@
+[console_scripts]
+check_logs = results.check_logs:main
+get_results = results.get_results:main
+

@@ -1,0 +1,2 @@
+git+ssh://git@git.labs.nuance.com/dhdaines/n3lu_cacdi.git@0.2.4#egg=n3lu_cacdi-0.2.4
+git+ssh://git@git.labs.nuance.com/xavier.bouthillier/fuel-cacdi.git#egg=fuel-cacdi-0.2.0
